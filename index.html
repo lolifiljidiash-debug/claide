@@ -43,7 +43,10 @@
   #closeShop { width: 100%; margin-top: 6px; padding: 12px; background: #ffffff22; color: #fff; }
 </style>
 <script type="importmap">
-  { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+  { "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  } }
 </script>
 </head>
 <body>
@@ -79,6 +82,7 @@
 
 <script type="module">
 import * as THREE from 'three';
+import { Reflector } from 'three/addons/objects/Reflector.js';
 
 const $ = (id) => document.getElementById(id);
 const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -158,7 +162,7 @@ const M = {
   sand: std(0xe6d09a), shell: std(0xffb3a0),
   coin: new THREE.MeshStandardMaterial({ color: 0xffc928, emissive: 0x7a5200, emissiveIntensity: 0.35, roughness: 0.3, metalness: 0.9 }),
   coinRim: new THREE.MeshStandardMaterial({ color: 0xe0a800, emissive: 0x5a3c00, emissiveIntensity: 0.3, roughness: 0.35, metalness: 0.9 }),
-  crab: std(0xe0362a), white: std(0xffffff),
+  crab: std(0xe0362a), white: std(0xffffff), leafDark: std(0x2f7f30), leafLight: std(0x6cc456),
   swordWood: std(0xc08a4a), swordGrip: std(0x5a3a1a), boots: std(0x7a2e1a),
   lanternGlow: new THREE.MeshStandardMaterial({ color: 0xffe2a0, emissive: 0xffb84a, emissiveIntensity: 2 }),
 };
@@ -187,6 +191,7 @@ function sfx(freq, dur = 0.1, type = 'square', vol = 0.04, slide = 1) {
 }
 
 const shadowy = (mesh) => { mesh.castShadow = true; mesh.receiveShadow = true; return mesh; };
+const shared = (g) => { g.userData.shared = true; return g; };
 
 function hash3(x, y, z) {
   const s = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453;
@@ -228,87 +233,354 @@ const spawn = new THREE.Vector3(0, 0, 2);
 
 function clearLevel() {
   levelGroup.traverse((o) => { if (o.geometry && !o.geometry.userData.shared) o.geometry.dispose(); });
+  if (fireflies) fireflies.mat.dispose();
+  fireflies = null;
   for (const c of crabs) c.mat.dispose();
+  for (const t of iceTops) t.mirror.dispose();
+  iceTops = [];
   scene.remove(levelGroup);
   levelGroup = new THREE.Group();
   scene.add(levelGroup);
   islands = []; ladders = []; hazards = []; obstacles = []; coins = []; crabs = []; portal = null; lamp = null;
 }
 
-function makeIsland(x, y, z, r, kind, rng) {
+// ---------- Island shapes ----------
+// An island's outline is r * (1 + amp * wobble(angle)), never smaller than r, so traps,
+// coins and crabs placed within r always stand on solid ground.
+function makeShape(rng, calm) {
+  const style = calm ? 0 : rng();
+  let amp, h;
+  if (style < 0.3) { amp = 0.09; h = [{ k: 3, a: 0.6 }, { k: 5, a: 0.4 }]; }                       // nearly round
+  else if (style < 0.65) { amp = 0.28; h = [{ k: 2, a: 0.65 }, { k: 3, a: 0.35 }]; }               // bean / clover
+  else { amp = 0.2; h = [{ k: 2, a: 0.35 }, { k: 5, a: 0.4 }, { k: 7, a: 0.25 }]; }               // jagged
+  for (const x of h) x.p = rng() * Math.PI * 2;
+  return { amp, h };
+}
+function shapeR(shape, r, th) {
+  let s = 0;
+  for (const x of shape.h) s += x.a * Math.cos(x.k * th + x.p);
+  return r * (1 + shape.amp * (0.5 + 0.5 * s));
+}
+const edgeR = (isl, x, z) => shapeR(isl.shape, isl.r, Math.atan2(z - isl.z, x - isl.x));
+
+// Rock strata and surface colours for every kind of island
+const PAL = {
+  normal: { top: [0x5cb84a, 0x7fd35f], lip: 0x55ad44, soil: 0x4a2f19, bands: [0x8b5a2b, 0xa8703e, 0x76492a, 0x9c7a5c, 0x6f625a, 0x8a5a33] },
+  start: { top: [0x68c852, 0x93e173], lip: 0x5fbb4b, soil: 0x4a2f19, bands: [0x8b5a2b, 0xb07a44, 0x7a4c28, 0xa38466, 0x6f625a, 0x93603a] },
+  end: { top: [0xe2c64e, 0xf3e08a], lip: 0xd6b944, soil: 0x5a3b1e, bands: [0x9a6a35, 0xc18d4f, 0x84552d, 0xb59a74, 0x77685c] },
+  ice: { top: [0xd4f1ff, 0xb8e3fa], lip: 0xf6fcff, soil: 0xcfe9f7, bands: [0x8cc0e4, 0xb5dcf3, 0x74a8d2, 0x9fcbe9, 0x6a9cc8] },
+  arena: { top: [0xe4cc93, 0xf1ddb0], lip: 0xd9bf86, soil: 0xc9a56a, bands: [0xd2ae74, 0xb98a55, 0xe0c38c, 0xa97a4c, 0xc89b63] },
+};
+const islandMat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95 });
+const capMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
+
+// Lower part of the island body: [t, radius scale], y = -1.05 - t * depth
+const PROFILES = {
+  cone: { depth: 1.3, rows: [[0.12, 0.86], [0.28, 0.72], [0.46, 0.54], [0.64, 0.36], [0.8, 0.2], [0.92, 0.08], [1, 0]] },
+  mesa: { depth: 0.95, rows: [[0.06, 0.93], [0.3, 0.9], [0.35, 0.79], [0.6, 0.77], [0.65, 0.64], [0.82, 0.54], [0.93, 0.3], [1, 0]] },
+  bulb: { depth: 1.4, rows: [[0.14, 0.97], [0.32, 0.9], [0.5, 0.72], [0.66, 0.5], [0.8, 0.3], [0.92, 0.12], [1, 0]] },
+};
+const TOP_ROWS = [[0, 1, 0], [-0.13, 1.0, 0.01], [-0.28, 0.99, 0.02], [-0.48, 0.975, 0.035], [-0.74, 0.955, 0.05], [-1.05, 0.93, 0.06]];
+
+const tmpCol = new THREE.Color();
+function pushColor(arr, hex, k) {
+  tmpCol.set(hex).multiplyScalar(k);
+  arr.push(tmpCol.r, tmpCol.g, tmpCol.b);
+}
+
+function islandBody(isl, seg, Rs, pal, profileName, seed) {
+  const r = isl.r, prof = PROFILES[profileName];
+  const D = prof.depth * r;
+  const rows = TOP_ROWS.map(([y, s, j]) => [y, s, j * r]);
+  for (const [t, s] of prof.rows) rows.push([-1.05 - t * D, s, (0.05 + t * 0.08) * r]);
+
+  // Ring vertices
+  const ring = rows.map(([y, s, j], i) => {
+    const pts = [];
+    for (let k = 0; k < seg; k++) {
+      const th = (k / seg) * Math.PI * 2;
+      const rad = s === 0 ? 0 : Math.max(0, Rs[k] * s + (hash3(k * 1.7, i * 3.1, seed) - 0.5) * j);
+      const yy = i < TOP_ROWS.length ? y : y + (hash3(k * 2.3, i * 1.3, seed + 1) - 0.5) * 0.35 * (r / 3);
+      pts.push(new THREE.Vector3(Math.cos(th) * rad, yy, Math.sin(th) * rad));
+    }
+    return pts;
+  });
+
+  const pos = [], col = [];
+  const bandH = 0.42 + r * 0.04;
+  for (let i = 0; i < rows.length - 1; i++) {
+    for (let k = 0; k < seg; k++) {
+      const k2 = (k + 1) % seg;
+      const a = ring[i][k], b = ring[i][k2], c = ring[i + 1][k], d = ring[i + 1][k2];
+      const depth = -(a.y + b.y + c.y + d.y) / 4;
+      const th = (k / seg) * Math.PI * 2;
+      const lipDepth = 0.14 + hash3(k, 7, seed) * 0.24;                       // grass hanging over the edge
+      const wave = Math.sin(th * 3 + seed) * 0.1 + (hash3(k, i, seed + 3) - 0.5) * 0.12;
+      let hex;
+      if (depth < lipDepth) hex = pal.lip;
+      else if (depth < 0.58 + wave * 0.5) hex = pal.soil;
+      else hex = pal.bands[Math.floor((depth - 0.58 + wave) / bandH) % pal.bands.length];
+      const shade = (0.9 + hash3(k, i, seed + 5) * 0.18) * (1 - Math.min(0.3, depth * 0.035));
+      for (const v of [a, b, c, b, d, c]) { pos.push(v.x, v.y, v.z); pushColor(col, hex, shade); }
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+// Flat top with soft colour patches
+function islandCap(seg, Rs, pal, seed, edgeDark = 0.85) {
+  const F = [0.22, 0.45, 0.65, 0.82, 0.93, 1];
+  const pos = [0, 0, 0], col = [], idx = [];
+  const c1 = new THREE.Color(pal.top[0]), c2 = new THREE.Color(pal.top[1]), c = new THREE.Color();
+  const patch = (x, z) => 0.5 + 0.25 * Math.sin(x * 0.9 + seed) * Math.cos(z * 0.8 - seed) + 0.25 * Math.sin((x - z) * 0.45 + seed * 2);
+  c.lerpColors(c1, c2, patch(0, 0)); col.push(c.r, c.g, c.b);
+  for (let f = 0; f < F.length; f++) {
+    for (let k = 0; k < seg; k++) {
+      const th = (k / seg) * Math.PI * 2, rad = Rs[k] * F[f];
+      const x = Math.cos(th) * rad, z = Math.sin(th) * rad;
+      pos.push(x, 0, z);
+      c.lerpColors(c1, c2, THREE.MathUtils.clamp(patch(x, z) + (hash3(x, z, seed) - 0.5) * 0.2, 0, 1));
+      if (f === F.length - 1) c.multiplyScalar(edgeDark);
+      col.push(c.r, c.g, c.b);
+    }
+  }
+  for (let k = 0; k < seg; k++) idx.push(0, 1 + ((k + 1) % seg), 1 + k);
+  for (let f = 0; f < F.length - 1; f++) {
+    for (let k = 0; k < seg; k++) {
+      const a = 1 + f * seg + k, b = 1 + f * seg + ((k + 1) % seg);
+      const cc = a + seg, d = b + seg;
+      idx.push(a, b, cc, b, d, cc);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+// Outline of the island top as a flat shape (for the ice mirror)
+function outlineGeometry(seg, Rs, scale = 1) {
+  const s = new THREE.Shape();
+  for (let k = 0; k < seg; k++) {
+    const th = (k / seg) * Math.PI * 2;
+    const x = Math.cos(th) * Rs[k] * scale, y = -Math.sin(th) * Rs[k] * scale;
+    k ? s.lineTo(x, y) : s.moveTo(x, y);
+  }
+  const g = new THREE.ShapeGeometry(s);
+  g.rotateX(-Math.PI / 2);
+  return g;
+}
+
+function frostTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#cfefff';
+  ctx.fillRect(0, 0, 256, 256);
+  const rnd = mulberry32(42);
+  for (let i = 0; i < 60; i++) {
+    ctx.fillStyle = `rgba(255,255,255,${0.05 + rnd() * 0.12})`;
+    ctx.beginPath();
+    ctx.arc(rnd() * 256, rnd() * 256, 6 + rnd() * 26, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 26; i++) {
+    let x = rnd() * 256, y = rnd() * 256, a = rnd() * Math.PI * 2;
+    ctx.strokeStyle = `rgba(255,255,255,${0.35 + rnd() * 0.4})`;
+    ctx.lineWidth = 0.6 + rnd() * 1.2;
+    ctx.beginPath(); ctx.moveTo(x, y);
+    for (let s = 0; s < 6; s++) { a += (rnd() - 0.5) * 1.2; x += Math.cos(a) * 14; y += Math.sin(a) * 14; ctx.lineTo(x, y); }
+    ctx.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(0.18, 0.18);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const iceFrostMat = new THREE.MeshStandardMaterial({ map: frostTexture(), transparent: true, opacity: 0.42, roughness: 0.15, metalness: 0.1, depthWrite: false });
+const rootMat = std(0x3e2614);
+let iceTops = [];
+
+function makeIsland(spec, rng) {
+  const { x, y, z, r, kind, shape } = spec;
   const g = new THREE.Group();
   g.position.set(x, y, z);
-  const seg = Math.max(10, Math.round(r * 4));
-  const grassMat = { start: M.grassStart, end: M.grassEnd, ice: M.ice, arena: M.sand }[kind] || M.grass;
-  const dirtMat = kind === 'ice' ? M.iceRock : M.dirt;
+  const isl = { x, y, z, r, kind, shape, group: g };
+  const seg = Math.max(40, Math.round(r * 13));
+  const Rs = [];
+  for (let k = 0; k < seg; k++) Rs.push(shapeR(shape, r, (k / seg) * Math.PI * 2));
+  isl.seg = seg; isl.Rs = Rs;
+  const pal = PAL[kind] || PAL.normal;
+  const seed = rng() * 100;
+  const profile = kind === 'arena' ? 'mesa' : kind === 'ice' ? 'cone' : ['cone', 'mesa', 'bulb'][Math.floor(rng() * 3)];
 
-  const grass = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.98, 0.35, seg), grassMat));
-  grass.position.y = -0.175;
-  const dirt = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(r * 0.98, r * 0.92, 0.7, seg), dirtMat));
-  dirt.position.y = -0.7;
+  const body = shadowy(new THREE.Mesh(islandBody(isl, seg, Rs, pal, profile, seed), islandMat));
+  g.add(body);
 
-  const coneH = r * 1.3;
-  const coneGeo = new THREE.ConeGeometry(r * 0.92, coneH, seg, 3);
-  const pa = coneGeo.attributes.position;
-  for (let i = 0; i < pa.count; i++) {
-    const vx = pa.getX(i), vy = pa.getY(i), vz = pa.getZ(i);
-    if (vy > coneH / 2 - 0.01) continue; // keep the top ring flush with the dirt layer
-    const j = (hash3(vx * 3, vy * 3, vz * 3) - 0.5) * r * 0.25;
-    pa.setXYZ(i, vx + j, vy + j * 0.5, vz - j);
+  if (kind === 'ice') {
+    // Opaque ice for far away; up close a real mirror shows through the frosted layer
+    const base = new THREE.Mesh(islandCap(seg, Rs, pal, seed, 0.95), capMat);
+    base.receiveShadow = true;
+    const mirror = new Reflector(outlineGeometry(seg, Rs), {
+      textureWidth: 512, textureHeight: 512, color: 0xa6c8dc, clipBias: 0.003,
+    });
+    mirror.position.y = 0.004;
+    mirror.visible = false;
+    const frost = new THREE.Mesh(outlineGeometry(seg, Rs), iceFrostMat);
+    frost.position.y = 0.012;
+    frost.receiveShadow = true;
+    g.add(base, mirror, frost);
+    iceTops.push({ isl, base, mirror });
+  } else {
+    const cap = new THREE.Mesh(islandCap(seg, Rs, pal, seed), capMat);
+    cap.receiveShadow = true;
+    g.add(cap);
   }
-  coneGeo.computeVertexNormals();
-  const cone = shadowy(new THREE.Mesh(coneGeo, dirtMat));
-  cone.rotation.x = Math.PI;
-  cone.position.y = -1.05 - coneH / 2;
-  g.add(grass, dirt, cone);
 
-  // Hanging rocks and grass tufts
+  // Hanging rocks under the island
   for (let i = 0; i < 3; i++) {
-    const a = rng() * Math.PI * 2, d = r * (0.3 + rng() * 0.4);
-    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.3 + rng() * 0.4, 0), M.rock);
-    rock.position.set(Math.cos(a) * d, -1.4 - rng() * coneH * 0.4, Math.sin(a) * d);
+    const a = rng() * Math.PI * 2, d = r * (0.3 + rng() * 0.3);
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.25 + rng() * 0.35, 0), M.rock);
+    rock.position.set(Math.cos(a) * d, -1.6 - rng() * r * 0.5, Math.sin(a) * d);
     g.add(rock);
   }
+
   if (kind === 'ice') {
-    // Icicles under the rim and a few crystals on top
-    for (let i = 0; i < Math.round(r * 3); i++) {
-      const a = (i / Math.round(r * 3)) * Math.PI * 2 + rng() * 0.3, h = 0.4 + rng() * 0.8;
-      const ic = new THREE.Mesh(new THREE.ConeGeometry(0.12, h, 5), M.icicle);
+    const n = Math.round(r * 3.5);
+    for (let i = 0; i < n; i++) {
+      const k = Math.floor((i / n) * seg + rng() * 2) % seg, h = 0.35 + rng() * 0.9;
+      const th = (k / seg) * Math.PI * 2;
+      const ic = new THREE.Mesh(new THREE.ConeGeometry(0.1 + rng() * 0.06, h, 5), M.icicle);
       ic.rotation.x = Math.PI;
-      ic.position.set(Math.cos(a) * r * 0.9, -1.05 - h / 2, Math.sin(a) * r * 0.9);
+      ic.position.set(Math.cos(th) * Rs[k] * 0.95, -0.3 - h / 2, Math.sin(th) * Rs[k] * 0.95);
       g.add(ic);
     }
-    for (let i = 0; i < 3; i++) {
-      const a = rng() * Math.PI * 2, d = r * (0.7 + rng() * 0.2);
-      const cr = shadowy(new THREE.Mesh(new THREE.OctahedronGeometry(0.18 + rng() * 0.12, 0), M.icicle));
-      cr.position.set(Math.cos(a) * d, 0.18, Math.sin(a) * d);
+    for (let i = 0; i < 4; i++) {
+      const a = rng() * Math.PI * 2, d = r * (0.72 + rng() * 0.2);
+      const cr = shadowy(new THREE.Mesh(new THREE.OctahedronGeometry(0.16 + rng() * 0.14, 0), M.icicle));
+      cr.position.set(Math.cos(a) * d, 0.2, Math.sin(a) * d);
       cr.scale.y = 1.8;
+      cr.rotation.y = rng() * 3;
       g.add(cr);
     }
-  }
-  if (kind === 'arena') {
-    for (let i = 0; i < 6; i++) {
+  } else if (kind === 'arena') {
+    for (let i = 0; i < 7; i++) {
       const a = rng() * Math.PI * 2, d = r * (0.3 + rng() * 0.6);
       const sh = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.1, 6), M.shell);
       sh.position.set(Math.cos(a) * d, 0.05, Math.sin(a) * d);
       g.add(sh);
     }
-  }
-  const tufts = kind === 'ice' || kind === 'arena' ? 0 : Math.round(r * 2);
-  for (let i = 0; i < tufts; i++) {
-    const a = rng() * Math.PI * 2, d = r * (0.55 + rng() * 0.4);
-    const isFlower = rng() < 0.35;
-    const t = new THREE.Mesh(
-      isFlower ? new THREE.IcosahedronGeometry(0.09, 0) : new THREE.ConeGeometry(0.08, 0.3, 4),
-      isFlower ? (rng() < 0.5 ? M.flower : M.flower2) : M.leaf2);
-    t.position.set(Math.cos(a) * d, isFlower ? 0.12 : 0.15, Math.sin(a) * d);
-    g.add(t);
+  } else {
+    // Roots dangling from the grass edge
+    const n = Math.round(r * 2.5);
+    for (let i = 0; i < n; i++) {
+      const k = Math.floor(rng() * seg), th = (k / seg) * Math.PI * 2, len = 0.3 + rng() * 0.8;
+      const root = new THREE.Mesh(new THREE.ConeGeometry(0.035, len, 4), rootMat);
+      root.rotation.x = Math.PI;
+      root.rotation.z = (rng() - 0.5) * 0.4;
+      root.position.set(Math.cos(th) * Rs[k] * 0.985, -0.25 - len / 2, Math.sin(th) * Rs[k] * 0.985);
+      g.add(root);
+    }
+    // Flowers and pebbles
+    for (let i = 0; i < Math.round(r * 1.6); i++) {
+      const a = rng() * Math.PI * 2, d = r * (0.3 + rng() * 0.65);
+      const fl = new THREE.Mesh(new THREE.IcosahedronGeometry(0.08, 0), rng() < 0.5 ? M.flower : M.flower2);
+      fl.position.set(Math.cos(a) * d, 0.22, Math.sin(a) * d);
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.22, 3), M.leaf2);
+      stem.position.set(fl.position.x, 0.11, fl.position.z);
+      g.add(fl, stem);
+    }
+    for (let i = 0; i < 2; i++) {
+      const a = rng() * Math.PI * 2, d = r * (0.6 + rng() * 0.3);
+      const pb = shadowy(new THREE.Mesh(new THREE.DodecahedronGeometry(0.12 + rng() * 0.12, 0), M.rock));
+      pb.position.set(Math.cos(a) * d, 0.05, Math.sin(a) * d);
+      pb.scale.y = 0.6;
+      g.add(pb);
+    }
   }
 
   levelGroup.add(g);
-  const isl = { x, y, z, r, kind, group: g };
   islands.push(isl);
   return isl;
+}
+
+// ---------- Grass ----------
+const windUniform = { value: 0 };
+const bladeGeo = shared((() => {
+  const w = 0.075;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute([-w / 2, 0, 0, w / 2, 0, 0, -w * 0.33, 0.5, 0.02, w * 0.33, 0.5, 0.02, 0, 1, 0.07], 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0], 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute([0.62, 0.62, 0.62, 0.62, 0.62, 0.62, 0.88, 0.88, 0.88, 0.88, 0.88, 0.88, 1.18, 1.18, 1.12], 3));
+  // Both windings with the same upward normal, so the back of a blade is lit like the front
+  g.setIndex([0, 1, 2, 1, 3, 2, 2, 3, 4, 2, 1, 0, 2, 3, 1, 4, 3, 2]);
+  return g;
+})());
+const bladeMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
+bladeMat.onBeforeCompile = (sh) => {
+  sh.uniforms.uTime = windUniform;
+  sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+    #ifdef USE_INSTANCING
+      float wph = instanceMatrix[3].x * 0.7 + instanceMatrix[3].z * 0.5;
+      transformed.x += sin(uTime * 2.1 + wph) * 0.13 * position.y;
+      transformed.z += cos(uTime * 1.6 + wph * 1.3) * 0.07 * position.y;
+    #endif`);
+};
+
+function makeGrass(rng) {
+  const spots = [];
+  for (const isl of islands) {
+    if (isl.kind === 'ice' || isl.kind === 'arena') continue;
+    const area = Math.PI * (isl.r * (1 + isl.shape.amp / 2)) ** 2;
+    const n = Math.round(area * (isl.kind === 'start' ? 15 : 17));
+    const pal = PAL[isl.kind] || PAL.normal;
+    for (let i = 0; i < n; i++) {
+      const th = rng() * Math.PI * 2;
+      const d = Math.sqrt(rng()) * 0.97 * shapeR(isl.shape, isl.r, th);
+      const x = isl.x + Math.cos(th) * d, z = isl.z + Math.sin(th) * d;
+      // Keep clear of spike plates and the start island furniture
+      if (hazards.some((h) => h.type === 'spikes' && h.isl === isl && Math.hypot(x - isl.x, z - isl.z) < h.R + 0.35)) continue;
+      if (isl.kind === 'start' && obstacles.some((o) => Math.hypot(x - o.x, z - o.z) < o.r + 0.15)) continue;
+      spots.push({ x, y: isl.y, z, pal, edge: d / shapeR(isl.shape, isl.r, th) });
+    }
+  }
+  const mesh = new THREE.InstancedMesh(bladeGeo, bladeMat, spots.length);
+  mesh.receiveShadow = true;
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), s = new THREE.Vector3(), p = new THREE.Vector3();
+  const c1 = new THREE.Color(), c2 = new THREE.Color(), c = new THREE.Color();
+  spots.forEach((sp, i) => {
+    e.set((rng() - 0.5) * 0.35, rng() * Math.PI * 2, (rng() - 0.5) * 0.35);
+    q.setFromEuler(e);
+    const h = 0.18 + rng() * 0.26 * (1 - sp.edge * 0.35);
+    s.set(0.8 + rng() * 0.5, h, 1);
+    p.set(sp.x, sp.y, sp.z);
+    m.compose(p, q, s);
+    mesh.setMatrixAt(i, m);
+    c.lerpColors(c1.set(sp.pal.top[0]), c2.set(sp.pal.top[1]), rng()).multiplyScalar(0.85 + rng() * 0.3);
+    mesh.setColorAt(i, c);
+  });
+  levelGroup.add(mesh);
+}
+
+// Only the ice island nearest to the player gets a live mirror (one extra render)
+function updateIce() {
+  let best = null, bestD = 45;
+  for (const t of iceTops) {
+    const d = Math.hypot(P.x - t.isl.x, P.z - t.isl.z) - t.isl.r;
+    if (d < bestD) { bestD = d; best = t; }
+  }
+  for (const t of iceTops) {
+    t.mirror.visible = t === best;
+    t.base.visible = t !== best;
+  }
 }
 
 function makeLadder(x, z, y0, y1, dx, dz) {
@@ -440,23 +712,105 @@ function glowTexture() {
 }
 const glowMat = new THREE.SpriteMaterial({ map: glowTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 });
 
+// Tube along a curve whose radius shrinks from r0 to r1 (trunk, branches, roots)
+function taperedTube(points, r0, r1, radial, segs) {
+  const curve = new THREE.CatmullRomCurve3(points.map((p) => new THREE.Vector3(...p)));
+  const pos = [], idx = [];
+  const up = new THREE.Vector3(), b1 = new THREE.Vector3(), b2 = new THREE.Vector3(), c = new THREE.Vector3(), t = new THREE.Vector3();
+  for (let i = 0; i <= segs; i++) {
+    const u = i / segs;
+    curve.getPointAt(u, c);
+    curve.getTangentAt(u, t);
+    up.set(Math.abs(t.y) < 0.95 ? 0 : 1, Math.abs(t.y) < 0.95 ? 1 : 0, 0);
+    b1.crossVectors(t, up).normalize();
+    b2.crossVectors(t, b1);
+    const rad = THREE.MathUtils.lerp(r0, r1, u) * (1 + (hash3(i, u * 7, r0) - 0.5) * 0.18);
+    for (let k = 0; k < radial; k++) {
+      const a = (k / radial) * Math.PI * 2;
+      pos.push(c.x + (b1.x * Math.cos(a) + b2.x * Math.sin(a)) * rad,
+        c.y + (b1.y * Math.cos(a) + b2.y * Math.sin(a)) * rad,
+        c.z + (b1.z * Math.cos(a) + b2.z * Math.sin(a)) * rad);
+    }
+  }
+  for (let i = 0; i < segs; i++) for (let k = 0; k < radial; k++) {
+    const a = i * radial + k, b = i * radial + ((k + 1) % radial), cc = a + radial, d = b + radial;
+    idx.push(a, b, cc, b, d, cc);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+let fireflies = null;
+function updateFireflies() {
+  if (!fireflies) return;
+  const { list, geo, mat } = fireflies;
+  const pa = geo.attributes.position, ca = geo.attributes.color;
+  list.forEach((f, i) => {
+    const a = time * f.sp + f.ph;
+    pa.setXYZ(i, f.cx + Math.cos(a) * f.rad, f.cy + Math.sin(time * 0.8 + f.bob) * 0.5, f.cz + Math.sin(a * 1.3) * f.rad);
+    const b = 0.25 + 0.75 * Math.max(0, Math.sin(time * f.fl + f.ph)) ** 2;
+    ca.setXYZ(i, 0.85 * b, 1.0 * b, 0.35 * b);
+  });
+  pa.needsUpdate = ca.needsUpdate = true;
+  mat.opacity = Math.max(0, night - 0.3) * 1.1;
+}
+
 function makeStartDecor(isl) {
   const ox = isl.x, oy = isl.y, oz = isl.z;
 
-  // Tree
+  // Tree: curved tapered trunk, roots, branches and leafy crowns
   const tree = new THREE.Group();
   tree.position.set(ox - 4.3, oy, oz + 1.2);
-  const trunk = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.32, 2.4, 7), M.trunk));
-  trunk.position.y = 1.2;
-  tree.add(trunk);
-  [[0, 2.9, 0, 1.4, M.leaf], [0.8, 2.5, 0.3, 1.0, M.leaf2], [-0.7, 2.6, -0.4, 1.05, M.leaf2], [0.1, 3.7, -0.1, 0.9, M.leaf]]
-    .forEach(([x, y, z, s, m]) => {
-      const f = shadowy(new THREE.Mesh(new THREE.IcosahedronGeometry(s, 0), m));
-      f.position.set(x, y, z);
-      tree.add(f);
-    });
+  const trng = mulberry32(777);
+  tree.add(shadowy(new THREE.Mesh(taperedTube([[0, -0.1, 0], [0.12, 0.9, 0.05], [-0.06, 1.9, 0.12], [0.1, 2.9, 0.02], [0.02, 3.5, -0.05]], 0.4, 0.14, 9, 14), M.trunk)));
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + trng() * 0.4, l = 0.7 + trng() * 0.4;
+    tree.add(shadowy(new THREE.Mesh(taperedTube([[0, 0.45, 0], [Math.cos(a) * l * 0.5, 0.18, Math.sin(a) * l * 0.5], [Math.cos(a) * l, -0.05, Math.sin(a) * l]], 0.15, 0.04, 5, 5), M.trunk)));
+  }
+  const crowns = [[0.05, 3.9, -0.05, 1.35]];
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + 0.6 + trng() * 0.5, h = 1.9 + i * 0.32, l = 1.3 + trng() * 0.4;
+    const end = [Math.cos(a) * l, h + 0.9 + trng() * 0.3, Math.sin(a) * l];
+    tree.add(shadowy(new THREE.Mesh(taperedTube([[0, h, 0], [Math.cos(a) * l * 0.5, h + 0.55, Math.sin(a) * l * 0.5], end], 0.12, 0.05, 6, 7), M.trunk)));
+    crowns.push([...end, 0.85 + trng() * 0.25]);
+  }
+  const leafMats = [M.leaf, M.leaf2, M.leafDark, M.leafLight];
+  for (const [cx, cy, cz, cs] of crowns) {
+    for (let k = 0; k < 4; k++) {
+      const s = cs * (0.62 + trng() * 0.4);
+      const geo = new THREE.IcosahedronGeometry(s, 1);
+      const pa = geo.attributes.position;
+      for (let v = 0; v < pa.count; v++) {
+        const vx = pa.getX(v), vy = pa.getY(v), vz = pa.getZ(v);
+        const j = 1 + (hash3(vx * 4.1, vy * 4.3, vz * 3.7) - 0.5) * 0.28;
+        pa.setXYZ(v, vx * j, vy * j * 0.85, vz * j);
+      }
+      geo.computeVertexNormals();
+      const leaf = shadowy(new THREE.Mesh(geo, leafMats[k === 0 ? 2 : k === 3 ? 3 : Math.floor(trng() * 2)]));
+      leaf.position.set(cx + (trng() - 0.5) * cs * 0.9, cy + (k === 3 ? cs * 0.45 : (trng() - 0.4) * cs * 0.6), cz + (trng() - 0.5) * cs * 0.9);
+      tree.add(leaf);
+    }
+  }
   levelGroup.add(tree);
-  obstacles.push({ x: tree.position.x, z: tree.position.z, r: 0.3, h: 2.4 });
+  obstacles.push({ x: tree.position.x, z: tree.position.z, r: 0.38, h: 2.6 });
+
+  // Fireflies drift around the crowns and glow faintly at night
+  const FN = 26, fPos = new Float32Array(FN * 3), fCol = new Float32Array(FN * 3);
+  const fGeo = new THREE.BufferGeometry();
+  fGeo.setAttribute('position', new THREE.BufferAttribute(fPos, 3));
+  fGeo.setAttribute('color', new THREE.BufferAttribute(fCol, 3));
+  const fMat = new THREE.PointsMaterial({ size: 0.32, map: glowMat.map, vertexColors: true, transparent: true, opacity: 0,
+    depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+  const fPoints = new THREE.Points(fGeo, fMat);
+  fPoints.frustumCulled = false;
+  tree.add(fPoints);
+  fireflies = { mat: fMat, geo: fGeo, list: Array.from({ length: FN }, () => {
+    const c = crowns[Math.floor(trng() * crowns.length)];
+    return { cx: c[0], cy: c[1] - 0.6, cz: c[2], rad: c[3] + 0.3 + trng() * 0.9, sp: 0.25 + trng() * 0.5, ph: trng() * 6.28, fl: 1.5 + trng() * 2.5, bob: trng() * 6.28 };
+  }) };
 
   // Bench under the tree, facing the middle of the island
   const bench = new THREE.Group();
@@ -504,7 +858,6 @@ function makeStartDecor(isl) {
 }
 
 // Shared geometry for things spawned many times (kept across levels)
-const shared = (g) => { g.userData.shared = true; return g; };
 const coinGeo = shared(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 22));
 const coinFaceGeo = shared(new THREE.CylinderGeometry(0.21, 0.21, 0.08, 22));
 
@@ -571,7 +924,8 @@ function buildLevel(n) {
   clearLevel();
   const rng = mulberry32(n * 1013 + 7);
   const count = Math.min(6 + n * 2, 24);
-  const specs = [{ x: 0, y: 0, z: 0, r: 7, kind: 'start' }];
+  const specs = [{ x: 0, y: 0, z: 0, r: 7, kind: 'start', shape: makeShape(rng, true) }];
+  specs[0].shape.amp = 0.12;
   const links = [];
   const base = -Math.PI / 2;
   let heading = base, ladderCount = 0;
@@ -585,21 +939,24 @@ function buildLevel(n) {
     const arena = !last && (i === Math.floor(count * 0.45) || (n >= 2 && i === Math.floor(count * 0.8)));
     const r = last ? 4.5 : arena ? 5.3 + rng() * 0.8 : 2.3 + rng() * 1.5;
     const ladder = !last && i > 1 && (rng() < 0.3 || (i === Math.floor(count / 2) && ladderCount === 0));
+    const shape = makeShape(rng, ladder);
+    const back = Math.atan2(-dz, -dx);          // direction from the new island back to prev
     let dist, dy;
     if (ladder) {
       ladderCount++;
       dy = 3 + rng() * 2;                       // too high to jump — needs a ladder
-      dist = prev.r - 0.8 + 0.3 + r;            // ladder stands on prev's edge, right against the higher island
+      dist = prev.r - 0.8 + 0.3 + shapeR(shape, r, back);   // ladder on prev's top, right against the higher island
     } else {
       dy = -1.6 + rng() * 2.4;                  // at most +0.8 up: reachable with a jump
-      dist = prev.r + r + 1.3 + rng() * (1.0 + Math.min(n, 6) * 0.2);
+      const gap = 1.3 + rng() * (1.0 + Math.min(n, 6) * 0.2);
+      dist = shapeR(prev.shape, prev.r, heading) + shapeR(shape, r, back) + gap;
     }
     const kind = last ? 'end' : arena ? 'arena' : i > 1 && rng() < 0.22 ? 'ice' : 'normal';
-    specs.push({ x: prev.x + dx * dist, y: prev.y + dy, z: prev.z + dz * dist, r, kind });
+    specs.push({ x: prev.x + dx * dist, y: prev.y + dy, z: prev.z + dz * dist, r, kind, shape });
     links.push({ ladder, dx, dz });
   }
 
-  specs.forEach((s) => makeIsland(s.x, s.y, s.z, s.r, s.kind, rng));
+  specs.forEach((s) => makeIsland(s, rng));
   makeStartDecor(islands[0]);
 
   links.forEach((L, i) => {
@@ -644,6 +1001,8 @@ function buildLevel(n) {
       makeCrab(isl, isl.x + Math.cos(a) * d, isl.z + Math.sin(a) * d);
     }
   }
+
+  makeGrass(rng);
 
   lowestY = Math.min(...specs.map((s) => s.y));
   sea.position.y = lowestY - 32;
@@ -970,7 +1329,9 @@ function step(dt, mx, mz, iz) {
   // Push out of island sides and decor
   for (const isl of islands) {
     if (P.y < isl.y - 0.05 && P.y + PH > isl.y - 1.05) {
-      const dx = P.x - isl.x, dz = P.z - isl.z, d = Math.hypot(dx, dz), min = isl.r + PR;
+      const dx = P.x - isl.x, dz = P.z - isl.z, d = Math.hypot(dx, dz);
+      if (d > isl.r * (1 + isl.shape.amp) + PR) continue;
+      const min = edgeR(isl, P.x, P.z) + PR;
       if (d < min && d > 1e-4) { P.x = isl.x + (dx / d) * min; P.z = isl.z + (dz / d) * min; }
     }
   }
@@ -985,7 +1346,7 @@ function step(dt, mx, mz, iz) {
   grounded = false;
   for (const isl of islands) {
     const d = Math.hypot(P.x - isl.x, P.z - isl.z);
-    if (vel.y <= 0 && d < isl.r + 0.1 && y0 >= isl.y - 0.02 && P.y <= isl.y) {
+    if (vel.y <= 0 && y0 >= isl.y - 0.02 && P.y <= isl.y && d < isl.r * (1 + isl.shape.amp) + 0.1 && d < edgeR(isl, P.x, P.z) + 0.1) {
       P.y = isl.y; vel.y = 0; grounded = true; groundIsl = isl; break;
     }
     const under = isl.y - 1.05;
@@ -1090,7 +1451,7 @@ function updateCrabs(dt) {
       continue;
     }
     c.hitT -= dt; c.stun -= dt; c.anim += dt;
-    const playerHere = !climb && !pending && Math.hypot(P.x - isl.x, P.z - isl.z) < isl.r + 0.3 && Math.abs(P.y - isl.y) < 1.6;
+    const playerHere = !climb && !pending && Math.abs(P.y - isl.y) < 1.6 && Math.hypot(P.x - isl.x, P.z - isl.z) < edgeR(isl, P.x, P.z) + 0.3;
     let spd;
     if (playerHere) { c.tx = P.x; c.tz = P.z; spd = CRAB_SPEED; }
     else {
@@ -1236,6 +1597,8 @@ camera.position.set(0, 4, 10);
 
 function update(dt) {
   time += dt;
+  windUniform.value = time;
+  updateFireflies();
   if (jumpQueued) { jumpBuf = 0.15; jumpQueued = false; }
   invuln = Math.max(0, invuln - dt);
 
@@ -1309,7 +1672,7 @@ function updateCamera(dt) {
     P.z + Math.cos(yaw) * Math.cos(pitch) * dist);
   // Don't let the camera dip inside the island the player stands on
   for (const isl of islands) {
-    if (Math.hypot(camPos.x - isl.x, camPos.z - isl.z) < isl.r + 0.5 && camPos.y < isl.y + 0.5 && camPos.y > isl.y - 3) camPos.y = isl.y + 0.5;
+    if (camPos.y < isl.y + 0.5 && camPos.y > isl.y - 3 && Math.hypot(camPos.x - isl.x, camPos.z - isl.z) < edgeR(isl, camPos.x, camPos.z) + 0.5) camPos.y = isl.y + 0.5;
   }
   camera.position.lerp(camPos, Math.min(1, dt * 10));
   camera.lookAt(camTarget);
@@ -1340,6 +1703,7 @@ function loop(now) {
   else if (!started) updateHazards(dt);
   updateCamera(dt);
   updateEnv(dt);
+  updateIce();
   updateClouds(dt);
   updateHud();
   renderer.render(scene, camera);

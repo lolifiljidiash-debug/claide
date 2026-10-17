@@ -1,0 +1,894 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Небесные острова</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  canvas { display: block; touch-action: none; }
+  #hud { position: fixed; top: 12px; left: 12px; color: #fff; text-shadow: 0 1px 3px #000c; font-size: 17px; line-height: 1.6; pointer-events: none; }
+  #hud b { font-weight: 700; }
+  #help { position: fixed; bottom: 10px; left: 0; right: 0; text-align: center; color: #fffc; text-shadow: 0 1px 3px #000; font-size: 13px; pointer-events: none; }
+  #msg { position: fixed; top: 28%; left: 0; right: 0; text-align: center; color: #fff; font-size: clamp(26px, 6vw, 46px); font-weight: 800; text-shadow: 0 3px 12px #000; opacity: 0; transition: opacity .4s; pointer-events: none; }
+  #flash { position: fixed; inset: 0; background: #d00; opacity: 0; pointer-events: none; transition: opacity .35s; }
+  #start { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(#0006, #000b); color: #fff; cursor: pointer; z-index: 5; }
+  #start .box { max-width: 520px; padding: 28px; text-align: center; }
+  #start h1 { margin: 0 0 12px; font-size: clamp(30px, 7vw, 48px); }
+  #start p { margin: 6px 0; opacity: .9; }
+  #start .go { display: inline-block; margin-top: 18px; padding: 12px 28px; border-radius: 30px; background: #ffcf4a; color: #332; font-weight: 800; font-size: 18px; }
+  #touch { display: none; }
+  .touch #touch { display: block; }
+  .touch #help { display: none; }
+  #joy { position: fixed; left: 24px; bottom: 24px; width: 130px; height: 130px; border-radius: 50%; background: #fff2; border: 2px solid #fff5; touch-action: none; }
+  #knob { position: absolute; left: 40px; top: 40px; width: 50px; height: 50px; border-radius: 50%; background: #fff8; }
+  #jumpBtn { position: fixed; right: 28px; bottom: 34px; width: 86px; height: 86px; border-radius: 50%; background: #ffcf4a99; border: 2px solid #fff8; color: #fff; font-weight: 800; display: flex; align-items: center; justify-content: center; touch-action: none; user-select: none; }
+  #timeBtn { position: fixed; right: 30px; bottom: 136px; width: 56px; height: 56px; border-radius: 50%; background: #fff3; border: 2px solid #fff6; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 22px; touch-action: none; user-select: none; }
+</style>
+<script type="importmap">
+  { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="hud"></div>
+<div id="help">WASD / стрелки — бег · Пробел — прыжок · W/S у лестницы — лезть · Мышь — камера · T (держать) — ускорить время</div>
+<div id="msg"></div>
+<div id="flash"></div>
+<div id="touch">
+  <div id="joy"><div id="knob"></div></div>
+  <div id="jumpBtn">ПРЫЖОК</div>
+  <div id="timeBtn">⏩</div>
+</div>
+<div id="start">
+  <div class="box">
+    <h1>Небесные острова</h1>
+    <p>Прыгай с острова на остров, забирайся по лестницам на высокие острова.</p>
+    <p>Берегись шипов, выскакивающих из земли, и летающих пил.</p>
+    <p>На последнем острове — портал на следующий уровень.</p>
+    <p>Время суток меняется: утро, день, вечер, ночь.</p>
+    <div class="go">Играть</div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+
+const $ = (id) => document.getElementById(id);
+const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+if (isTouch) document.body.classList.add('touch');
+
+// ---------- Renderer / scene ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+scene.fog = new THREE.Fog(0x87ceeb, 45, 170);
+
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 700);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+const hemi = new THREE.HemisphereLight(0xffffff, 0x3a4a2a, 1);
+scene.add(hemi);
+
+const sun = new THREE.DirectionalLight(0xffffff, 2);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -26, right: 26, top: 26, bottom: -26, near: 1, far: 140 });
+sun.shadow.bias = -0.0006;
+scene.add(sun, sun.target);
+
+// Sun, moon, stars
+const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(9, 20, 14), new THREE.MeshBasicMaterial({ color: 0xfff2b0, fog: false }));
+const moonDisc = new THREE.Mesh(new THREE.SphereGeometry(6, 20, 14), new THREE.MeshBasicMaterial({ color: 0xdfe6ff, fog: false }));
+scene.add(sunDisc, moonDisc);
+
+const stars = (() => {
+  const n = 900, pos = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    const u = Math.random() * Math.PI * 2, v = Math.random() * 0.95 + 0.05;
+    const r = 450, c = Math.sqrt(1 - v * v);
+    pos.set([Math.cos(u) * c * r, v * r, Math.sin(u) * c * r], i * 3);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const m = new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false });
+  const p = new THREE.Points(g, m);
+  scene.add(p);
+  return p;
+})();
+
+// Sea far below
+const sea = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000), new THREE.MeshStandardMaterial({ color: 0x2a74a8, roughness: 0.35, metalness: 0.1 }));
+sea.rotation.x = -Math.PI / 2;
+scene.add(sea);
+
+// ---------- Materials ----------
+const std = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 1, flatShading: true, ...extra });
+const M = {
+  grass: std(0x5fbf4f), grassStart: std(0x74d35a), grassEnd: std(0xe6cf5c),
+  dirt: std(0x8b5a2b), rock: std(0x7d7268), trunk: std(0x6b4423), leaf: std(0x3f9c3a), leaf2: std(0x52b347),
+  wood: std(0xa0703a), darkWood: std(0x5a3a1a), iron: std(0x2f3438, { roughness: 0.6 }),
+  metal: new THREE.MeshStandardMaterial({ color: 0xb9c3cc, roughness: 0.35, metalness: 0.8, flatShading: true }),
+  hole: new THREE.MeshBasicMaterial({ color: 0x1e140b }),
+  red: std(0xc0392b), flower: std(0xffe066), flower2: std(0xff7aa8),
+  bulb: new THREE.MeshStandardMaterial({ color: 0xfff3c4, emissive: 0xffc860, emissiveIntensity: 0.2 }),
+  portal: new THREE.MeshStandardMaterial({ color: 0x7b4dff, emissive: 0x7b4dff, emissiveIntensity: 1.2, roughness: 0.4 }),
+  portalDisc: new THREE.MeshBasicMaterial({ color: 0xb79bff, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false }),
+  cloud: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }),
+  body: std(0x3b82f6), skin: std(0xffd7b0), eye: new THREE.MeshBasicMaterial({ color: 0x111111 }),
+};
+
+const shadowy = (mesh) => { mesh.castShadow = true; mesh.receiveShadow = true; return mesh; };
+
+function hash3(x, y, z) {
+  const s = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// ---------- Clouds ----------
+const clouds = [];
+for (let i = 0; i < 16; i++) {
+  const g = new THREE.Group();
+  const parts = 3 + Math.floor(Math.random() * 3);
+  for (let k = 0; k < parts; k++) {
+    const s = 1.5 + Math.random() * 2;
+    const c = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 0), M.cloud);
+    c.position.set(k * 2.2 - parts, Math.random() * 0.8, Math.random() * 1.5);
+    c.scale.y = 0.6;
+    g.add(c);
+  }
+  g.position.set((Math.random() - 0.5) * 220, 10 + Math.random() * 25, (Math.random() - 0.5) * 220);
+  scene.add(g);
+  clouds.push(g);
+}
+
+// ---------- Level state ----------
+let levelGroup = new THREE.Group();
+scene.add(levelGroup);
+let islands = [], ladders = [], hazards = [], obstacles = [], portal = null, lamp = null;
+let level = 1, lowestY = 0;
+const spawn = new THREE.Vector3(0, 0, 2);
+
+function clearLevel() {
+  levelGroup.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+  scene.remove(levelGroup);
+  levelGroup = new THREE.Group();
+  scene.add(levelGroup);
+  islands = []; ladders = []; hazards = []; obstacles = []; portal = null; lamp = null;
+}
+
+function makeIsland(x, y, z, r, kind, rng) {
+  const g = new THREE.Group();
+  g.position.set(x, y, z);
+  const seg = Math.max(10, Math.round(r * 4));
+  const grassMat = kind === 'start' ? M.grassStart : kind === 'end' ? M.grassEnd : M.grass;
+
+  const grass = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.98, 0.35, seg), grassMat));
+  grass.position.y = -0.175;
+  const dirt = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(r * 0.98, r * 0.92, 0.7, seg), M.dirt));
+  dirt.position.y = -0.7;
+
+  const coneH = r * 1.3;
+  const coneGeo = new THREE.ConeGeometry(r * 0.92, coneH, seg, 3);
+  const pa = coneGeo.attributes.position;
+  for (let i = 0; i < pa.count; i++) {
+    const vx = pa.getX(i), vy = pa.getY(i), vz = pa.getZ(i);
+    if (vy > coneH / 2 - 0.01) continue; // keep the top ring flush with the dirt layer
+    const j = (hash3(vx * 3, vy * 3, vz * 3) - 0.5) * r * 0.25;
+    pa.setXYZ(i, vx + j, vy + j * 0.5, vz - j);
+  }
+  coneGeo.computeVertexNormals();
+  const cone = shadowy(new THREE.Mesh(coneGeo, M.dirt));
+  cone.rotation.x = Math.PI;
+  cone.position.y = -1.05 - coneH / 2;
+  g.add(grass, dirt, cone);
+
+  // Hanging rocks and grass tufts
+  for (let i = 0; i < 3; i++) {
+    const a = rng() * Math.PI * 2, d = r * (0.3 + rng() * 0.4);
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.3 + rng() * 0.4, 0), M.rock);
+    rock.position.set(Math.cos(a) * d, -1.4 - rng() * coneH * 0.4, Math.sin(a) * d);
+    g.add(rock);
+  }
+  const tufts = Math.round(r * 2);
+  for (let i = 0; i < tufts; i++) {
+    const a = rng() * Math.PI * 2, d = r * (0.55 + rng() * 0.4);
+    const isFlower = rng() < 0.35;
+    const t = new THREE.Mesh(
+      isFlower ? new THREE.IcosahedronGeometry(0.09, 0) : new THREE.ConeGeometry(0.08, 0.3, 4),
+      isFlower ? (rng() < 0.5 ? M.flower : M.flower2) : M.leaf2);
+    t.position.set(Math.cos(a) * d, isFlower ? 0.12 : 0.15, Math.sin(a) * d);
+    g.add(t);
+  }
+
+  levelGroup.add(g);
+  const isl = { x, y, z, r, kind, group: g };
+  islands.push(isl);
+  return isl;
+}
+
+function makeLadder(x, z, y0, y1, dx, dz) {
+  const g = new THREE.Group();
+  g.position.set(x, y0, z);
+  g.rotation.y = Math.atan2(dx, dz); // local +z points toward the higher island
+  const h = y1 - y0 + 0.9;
+  for (const sx of [-0.35, 0.35]) {
+    const rail = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.09, h, 0.09), M.wood));
+    rail.position.set(sx, h / 2, 0);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.4), M.darkWood);
+    arm.position.set(sx, y1 - y0 - 0.25, 0.2);
+    g.add(rail, arm);
+  }
+  for (let y = 0.3; y < h - 0.1; y += 0.38) {
+    const rung = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.06, 0.07), M.darkWood));
+    rung.position.set(0, y, 0);
+    g.add(rung);
+  }
+  levelGroup.add(g);
+  ladders.push({ x, z, y0, y1, dx, dz });
+}
+
+function makeSpikes(isl, period, phase) {
+  const g = new THREE.Group();
+  g.position.set(isl.x, isl.y, isl.z);
+  const R = Math.min(1.2, isl.r - 1.0);
+  const plate = new THREE.Mesh(new THREE.CylinderGeometry(R + 0.2, R + 0.2, 0.04, 24), M.iron);
+  plate.position.y = 0.02;
+  plate.receiveShadow = true;
+  g.add(plate);
+  const spikeGroup = new THREE.Group();
+  const spikeGeo = new THREE.ConeGeometry(0.13, 0.55, 6);
+  const holeGeo = new THREE.CircleGeometry(0.12, 8);
+  for (let sx = -R; sx <= R + 0.001; sx += 0.4) {
+    for (let sz = -R; sz <= R + 0.001; sz += 0.4) {
+      if (sx * sx + sz * sz > R * R) continue;
+      const s = shadowy(new THREE.Mesh(spikeGeo, M.metal));
+      s.position.set(sx, 0.275, sz);
+      spikeGroup.add(s);
+      const hole = new THREE.Mesh(holeGeo, M.hole);
+      hole.rotation.x = -Math.PI / 2;
+      hole.position.set(sx, 0.045, sz);
+      g.add(hole);
+    }
+  }
+  g.add(spikeGroup);
+  levelGroup.add(g);
+  hazards.push({ type: 'spikes', isl, R, period, phase, spikeGroup, ext: 0 });
+}
+
+function makeSaw(isl, dx, dz, speed, phase) {
+  const px = -dz, pz = dx; // saw flies across the path, left and right
+  const amp = isl.r - 0.8;
+  const pivot = new THREE.Group();
+  pivot.position.set(isl.x, isl.y, isl.z);
+  pivot.rotation.y = Math.atan2(px, pz); // local +z = flight direction
+
+  const groove = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.03, amp * 2 + 0.6), M.iron);
+  groove.position.y = 0.015;
+  groove.receiveShadow = true;
+  pivot.add(groove);
+  for (const s of [-1, 1]) {
+    const post = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.35, 6), M.red));
+    post.position.set(0, 0.17, s * (amp + 0.3));
+    pivot.add(post);
+  }
+
+  const holder = new THREE.Group();
+  holder.position.y = 0.68;
+  const spinner = new THREE.Group();
+  const blade = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.06, 24), M.metal));
+  blade.rotation.z = Math.PI / 2;
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.1, 10), M.red);
+  hub.rotation.z = Math.PI / 2;
+  spinner.add(blade, hub);
+  const toothGeo = new THREE.ConeGeometry(0.08, 0.22, 4);
+  for (let i = 0; i < 14; i++) {
+    const a = (i / 14) * Math.PI * 2;
+    const t = new THREE.Mesh(toothGeo, M.metal);
+    t.position.set(0, Math.sin(a) * 0.6, Math.cos(a) * 0.6);
+    t.rotation.x = Math.PI / 2 - a;
+    spinner.add(t);
+  }
+  holder.add(spinner);
+  pivot.add(holder);
+  levelGroup.add(pivot);
+  hazards.push({ type: 'saw', isl, px, pz, amp, speed, phase, holder, spinner, off: 0 });
+}
+
+function makePortal(isl, dx, dz) {
+  const g = new THREE.Group();
+  g.position.set(isl.x, isl.y, isl.z);
+  g.rotation.y = Math.atan2(dx, dz);
+  const ring = shadowy(new THREE.Mesh(new THREE.TorusGeometry(1.25, 0.17, 12, 36), M.portal));
+  ring.position.y = 1.55;
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(1.12, 36), M.portalDisc);
+  disc.position.y = 1.55;
+  g.add(ring, disc);
+  for (const s of [-1, 1]) {
+    const stone = shadowy(new THREE.Mesh(new THREE.DodecahedronGeometry(0.35, 0), M.rock));
+    stone.position.set(s * 1.3, 0.2, 0);
+    g.add(stone);
+  }
+  const sparks = [];
+  for (let i = 0; i < 10; i++) {
+    const sp = new THREE.Mesh(new THREE.OctahedronGeometry(0.08, 0), M.portal);
+    g.add(sp);
+    sparks.push(sp);
+  }
+  const light = new THREE.PointLight(0x9b6bff, 12, 10, 1.5);
+  light.position.y = 1.6;
+  g.add(light);
+  levelGroup.add(g);
+  portal = { isl, disc, ring, sparks };
+}
+
+function glowTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const ctx = c.getContext('2d');
+  const gr = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gr.addColorStop(0, 'rgba(255,220,140,1)');
+  gr.addColorStop(0.3, 'rgba(255,200,110,0.45)');
+  gr.addColorStop(1, 'rgba(255,190,90,0)');
+  ctx.fillStyle = gr;
+  ctx.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+}
+const glowMat = new THREE.SpriteMaterial({ map: glowTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 });
+
+function makeStartDecor(isl) {
+  const ox = isl.x, oy = isl.y, oz = isl.z;
+
+  // Tree
+  const tree = new THREE.Group();
+  tree.position.set(ox - 4.3, oy, oz + 1.2);
+  const trunk = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.32, 2.4, 7), M.trunk));
+  trunk.position.y = 1.2;
+  tree.add(trunk);
+  [[0, 2.9, 0, 1.4, M.leaf], [0.8, 2.5, 0.3, 1.0, M.leaf2], [-0.7, 2.6, -0.4, 1.05, M.leaf2], [0.1, 3.7, -0.1, 0.9, M.leaf]]
+    .forEach(([x, y, z, s, m]) => {
+      const f = shadowy(new THREE.Mesh(new THREE.IcosahedronGeometry(s, 0), m));
+      f.position.set(x, y, z);
+      tree.add(f);
+    });
+  levelGroup.add(tree);
+  obstacles.push({ x: tree.position.x, z: tree.position.z, r: 0.3, h: 2.4 });
+
+  // Bench under the tree, facing the middle of the island
+  const bench = new THREE.Group();
+  bench.position.set(ox - 3.0, oy, oz + 0.9);
+  bench.rotation.y = Math.PI / 2;
+  const seat = shadowy(new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.08, 0.5), M.wood));
+  seat.position.y = 0.48;
+  const back = shadowy(new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.4, 0.06), M.wood));
+  back.position.set(0, 0.82, -0.24);
+  bench.add(seat, back);
+  for (const lx of [-0.7, 0.7]) for (const lz of [-0.18, 0.18]) {
+    const leg = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.48, 0.08), M.iron));
+    leg.position.set(lx, 0.24, lz);
+    bench.add(leg);
+  }
+  for (const lx of [-0.7, 0.7]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.5, 0.07), M.iron);
+    post.position.set(lx, 0.78, -0.24);
+    bench.add(post);
+  }
+  levelGroup.add(bench);
+  obstacles.push({ x: bench.position.x, z: bench.position.z - 0.45, r: 0.45, h: 1.0 });
+  obstacles.push({ x: bench.position.x, z: bench.position.z + 0.45, r: 0.45, h: 1.0 });
+
+  // Street lamp next to the bench
+  const lampG = new THREE.Group();
+  lampG.position.set(ox - 3.1, oy, oz - 0.9);
+  const pole = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 2.9, 8), M.iron));
+  pole.position.y = 1.45;
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.06), M.iron);
+  arm.position.set(0.22, 2.85, 0);
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.22, 8), M.iron);
+  cap.position.set(0.45, 2.9, 0);
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 8), M.bulb);
+  bulb.position.set(0.45, 2.72, 0);
+  const glow = new THREE.Sprite(glowMat);
+  glow.scale.set(2.6, 2.6, 1);
+  glow.position.copy(bulb.position);
+  const light = new THREE.PointLight(0xffc870, 0, 16, 1.6);
+  light.position.set(0.45, 2.55, 0);
+  lampG.add(pole, arm, cap, bulb, glow, light);
+  levelGroup.add(lampG);
+  obstacles.push({ x: lampG.position.x, z: lampG.position.z, r: 0.12, h: 2.9 });
+  lamp = { light };
+}
+
+function buildLevel(n) {
+  clearLevel();
+  const rng = mulberry32(n * 1013 + 7);
+  const count = Math.min(6 + n * 2, 24);
+  const specs = [{ x: 0, y: 0, z: 0, r: 7, kind: 'start' }];
+  const links = [];
+  const base = -Math.PI / 2;
+  let heading = base, ladderCount = 0;
+
+  for (let i = 1; i <= count; i++) {
+    const prev = specs[i - 1];
+    heading = THREE.MathUtils.clamp(heading + (rng() - 0.5) * 1.1, base - 1.1, base + 1.1);
+    const dx = Math.cos(heading), dz = Math.sin(heading);
+    const last = i === count;
+    const r = last ? 4.5 : 2.3 + rng() * 1.5;
+    const ladder = !last && i > 1 && (rng() < 0.3 || (i === Math.floor(count / 2) && ladderCount === 0));
+    let dist, dy;
+    if (ladder) {
+      ladderCount++;
+      dy = 3 + rng() * 2;                       // too high to jump — needs a ladder
+      dist = prev.r - 0.8 + 0.3 + r;            // ladder stands on prev's edge, right against the higher island
+    } else {
+      dy = -1.6 + rng() * 2.4;                  // at most +0.8 up: reachable with a jump
+      dist = prev.r + r + 1.3 + rng() * (1.0 + Math.min(n, 6) * 0.2);
+    }
+    specs.push({ x: prev.x + dx * dist, y: prev.y + dy, z: prev.z + dz * dist, r, kind: last ? 'end' : 'normal' });
+    links.push({ ladder, dx, dz });
+  }
+
+  specs.forEach((s) => makeIsland(s.x, s.y, s.z, s.r, s.kind, rng));
+  makeStartDecor(islands[0]);
+
+  links.forEach((L, i) => {
+    if (!L.ladder) return;
+    const a = specs[i], b = specs[i + 1];
+    makeLadder(a.x + L.dx * (a.r - 0.8), a.z + L.dz * (a.r - 0.8), a.y, b.y, L.dx, L.dz);
+  });
+
+  const hazardChance = Math.min(0.55 + n * 0.08, 0.92);
+  const spikePeriod = Math.max(2.0, 3.4 - n * 0.15);
+  const sawSpeed = 1.3 + Math.min(n, 8) * 0.2;
+  for (let i = 1; i < count; i++) {
+    if (links[i].ladder) continue;              // keep the ladder foot clear
+    if (rng() > hazardChance) continue;
+    const inc = links[i - 1];
+    if (rng() < 0.5) makeSpikes(islands[i], spikePeriod, rng() * spikePeriod);
+    else makeSaw(islands[i], inc.dx, inc.dz, sawSpeed * (0.85 + rng() * 0.3), rng() * 6);
+  }
+
+  const lastLink = links[links.length - 1];
+  makePortal(islands[count], lastLink.dx, lastLink.dz);
+
+  lowestY = Math.min(...specs.map((s) => s.y));
+  sea.position.y = lowestY - 32;
+  spawn.set(0, 0, 2);
+}
+
+// ---------- Player ----------
+const player = new THREE.Group();
+const bodyMesh = shadowy(new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 0.55, 4, 10), M.body));
+bodyMesh.position.y = 0.6;
+const head = shadowy(new THREE.Mesh(new THREE.SphereGeometry(0.27, 14, 10), M.skin));
+head.position.y = 1.32;
+const cap = shadowy(new THREE.Mesh(new THREE.SphereGeometry(0.28, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), M.red));
+cap.position.y = 1.36;
+const visor = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.04, 0.2), M.red);
+visor.position.set(0, 1.38, 0.28);
+const eyeGeo = new THREE.SphereGeometry(0.04, 6, 6);
+const eyeL = new THREE.Mesh(eyeGeo, M.eye), eyeR = new THREE.Mesh(eyeGeo, M.eye);
+eyeL.position.set(-0.1, 1.3, 0.24); eyeR.position.set(0.1, 1.3, 0.24);
+const model = new THREE.Group();
+model.add(bodyMesh, head, cap, visor, eyeL, eyeR);
+player.add(model);
+scene.add(player);
+
+const P = new THREE.Vector3(), vel = new THREE.Vector3();
+let grounded = false, coyote = 0, jumpBuf = 0, climb = null, facing = Math.PI;
+const SPEED = 6.5, JUMP = 8.6, GRAV = 22, CLIMB = 3.2, PR = 0.32, PH = 1.6;
+
+function respawn() {
+  P.copy(spawn); vel.set(0, 0, 0);
+  climb = null; grounded = true; facing = Math.PI;
+  yaw = 0; pitch = 0.35;
+}
+
+// ---------- Input ----------
+const keys = {};
+let jumpQueued = false, timeFast = false;
+addEventListener('keydown', (e) => {
+  keys[e.code] = true;
+  if (e.code === 'Space') { if (!e.repeat) jumpQueued = true; e.preventDefault(); }
+  if (e.code === 'KeyT') timeFast = true;
+});
+addEventListener('keyup', (e) => {
+  keys[e.code] = false;
+  if (e.code === 'KeyT') timeFast = false;
+});
+
+let yaw = 0, pitch = 0.35, dragging = false;
+const canvas = renderer.domElement;
+canvas.addEventListener('mousedown', () => {
+  dragging = true;
+  if (started && !isTouch && document.pointerLockElement !== canvas) canvas.requestPointerLock?.();
+});
+addEventListener('mouseup', () => (dragging = false));
+addEventListener('mousemove', (e) => {
+  if (document.pointerLockElement === canvas || dragging) rotateCam(e.movementX, e.movementY);
+});
+function rotateCam(mx, my) {
+  yaw -= mx * 0.0028;
+  pitch = THREE.MathUtils.clamp(pitch + my * 0.0028, 0.05, 1.25);
+}
+
+// Touch: joystick, jump button, drag elsewhere to look around
+const joy = { id: null, x: 0, y: 0 };
+const joyEl = $('joy'), knob = $('knob');
+let lookTouch = null;
+joyEl.addEventListener('touchstart', (e) => { joy.id = e.changedTouches[0].identifier; moveJoy(e.changedTouches[0]); e.preventDefault(); }, { passive: false });
+function moveJoy(t) {
+  const r = joyEl.getBoundingClientRect();
+  let x = (t.clientX - r.left - r.width / 2) / (r.width / 2);
+  let y = (t.clientY - r.top - r.height / 2) / (r.height / 2);
+  const l = Math.hypot(x, y);
+  if (l > 1) { x /= l; y /= l; }
+  joy.x = x; joy.y = -y;
+  knob.style.transform = `translate(${x * 40}px, ${y * 40}px)`;
+}
+$('jumpBtn').addEventListener('touchstart', (e) => { jumpQueued = true; e.preventDefault(); }, { passive: false });
+$('timeBtn').addEventListener('touchstart', (e) => { timeFast = true; e.preventDefault(); }, { passive: false });
+$('timeBtn').addEventListener('touchend', () => (timeFast = false));
+canvas.addEventListener('touchstart', (e) => {
+  const t = e.changedTouches[0];
+  lookTouch = { id: t.identifier, x: t.clientX, y: t.clientY };
+}, { passive: true });
+addEventListener('touchmove', (e) => {
+  for (const t of e.changedTouches) {
+    if (t.identifier === joy.id) moveJoy(t);
+    else if (lookTouch && t.identifier === lookTouch.id) {
+      rotateCam((t.clientX - lookTouch.x) * 1.6, (t.clientY - lookTouch.y) * 1.6);
+      lookTouch.x = t.clientX; lookTouch.y = t.clientY;
+    }
+  }
+  e.preventDefault();
+}, { passive: false });
+addEventListener('touchend', (e) => {
+  for (const t of e.changedTouches) {
+    if (t.identifier === joy.id) { joy.id = null; joy.x = joy.y = 0; knob.style.transform = ''; }
+    if (lookTouch && t.identifier === lookTouch.id) lookTouch = null;
+  }
+});
+
+// ---------- UI ----------
+let started = false, deaths = 0, transition = 0, msgTimer = 0;
+function showMsg(text, sec = 2) { $('msg').textContent = text; $('msg').style.opacity = 1; msgTimer = sec; }
+$('start').addEventListener('click', () => {
+  $('start').style.display = 'none';
+  started = true;
+  if (!isTouch) canvas.requestPointerLock?.();
+  showMsg('Уровень ' + level, 2);
+});
+
+function die() {
+  deaths++;
+  $('flash').style.opacity = 0.55;
+  setTimeout(() => ($('flash').style.opacity = 0), 140);
+  respawn();
+}
+
+// ---------- Physics ----------
+function nearLadderBottom(L) {
+  const sx = L.x - L.dx * 0.35, sz = L.z - L.dz * 0.35;
+  return Math.hypot(P.x - sx, P.z - sz) < 0.75 && P.y >= L.y0 - 0.3 && P.y < L.y1 - 0.2;
+}
+function nearLadderTop(L) {
+  const tx = L.x + L.dx * 0.7, tz = L.z + L.dz * 0.7;
+  return Math.hypot(P.x - tx, P.z - tz) < 0.6 && Math.abs(P.y - L.y1) < 0.1;
+}
+
+function step(dt, mx, mz, iz) {
+  if (climb) {
+    const L = climb;
+    P.x = L.x - L.dx * 0.35; P.z = L.z - L.dz * 0.35;
+    vel.set(0, 0, 0);
+    grounded = false;
+    facing = Math.atan2(L.dx, L.dz);
+    const c = Math.abs(iz) > 0.25 ? Math.sign(iz) : 0;
+    P.y += c * CLIMB * dt;
+    climbAnim += c * dt * 10;
+    if (jumpBuf > 0) {
+      climb = null; jumpBuf = 0;
+      vel.set(-L.dx * 4, 6, -L.dz * 4);
+    } else if (P.y >= L.y1) {
+      P.set(L.x + L.dx * 0.9, L.y1, L.z + L.dz * 0.9);
+      climb = null; grounded = true;
+    } else if (P.y <= L.y0 && c < 0) {
+      P.y = L.y0; climb = null; grounded = true;
+    }
+    return;
+  }
+
+  for (const L of ladders) {
+    const dot = mx * L.dx + mz * L.dz;
+    if (dot > 0.4 && nearLadderBottom(L)) { climb = L; return; }
+    if (dot < -0.4 && nearLadderTop(L)) { climb = L; P.y = L.y1 - 0.4; return; }
+  }
+
+  const k = Math.min(1, (grounded ? 16 : 7) * dt);
+  vel.x += (mx * SPEED - vel.x) * k;
+  vel.z += (mz * SPEED - vel.z) * k;
+
+  coyote = grounded ? 0.1 : coyote - dt;
+  if (jumpBuf > 0 && coyote > 0) {
+    vel.y = JUMP; coyote = 0; jumpBuf = 0; grounded = false;
+  }
+  vel.y = Math.max(vel.y - GRAV * dt, -30);
+
+  P.x += vel.x * dt; P.z += vel.z * dt;
+
+  // Push out of island sides and decor
+  for (const isl of islands) {
+    if (P.y < isl.y - 0.05 && P.y + PH > isl.y - 1.05) {
+      const dx = P.x - isl.x, dz = P.z - isl.z, d = Math.hypot(dx, dz), min = isl.r + PR;
+      if (d < min && d > 1e-4) { P.x = isl.x + (dx / d) * min; P.z = isl.z + (dz / d) * min; }
+    }
+  }
+  for (const o of obstacles) {
+    if (P.y > islands[0].y + o.h) continue;
+    const dx = P.x - o.x, dz = P.z - o.z, d = Math.hypot(dx, dz), min = o.r + PR;
+    if (d < min && d > 1e-4) { P.x = o.x + (dx / d) * min; P.z = o.z + (dz / d) * min; }
+  }
+
+  const y0 = P.y;
+  P.y += vel.y * dt;
+  grounded = false;
+  for (const isl of islands) {
+    const d = Math.hypot(P.x - isl.x, P.z - isl.z);
+    if (vel.y <= 0 && d < isl.r + 0.1 && y0 >= isl.y - 0.02 && P.y <= isl.y) {
+      P.y = isl.y; vel.y = 0; grounded = true; break;
+    }
+    const under = isl.y - 1.05;
+    if (vel.y > 0 && d < isl.r * 0.9 && y0 + PH <= under && P.y + PH > under) {
+      P.y = under - PH; vel.y = 0;
+    }
+  }
+}
+
+function sawHits(h) {
+  const sx = h.isl.x + h.px * h.off, sy = h.isl.y + 0.68, sz = h.isl.z + h.pz * h.off;
+  const cy = THREE.MathUtils.clamp(sy, P.y + PR, P.y + PH - PR);
+  const dx = P.x - sx, dy = cy - sy, dz = P.z - sz;
+  return dx * dx + dy * dy + dz * dz < (0.6 + PR) ** 2;
+}
+
+let time = 0, climbAnim = 0;
+function updateHazards(dt) {
+  for (const h of hazards) {
+    if (h.type === 'spikes') {
+      const u = (((time + h.phase) % h.period) + h.period) % h.period / h.period;
+      let e;
+      if (u < 0.33) e = 0;
+      else if (u < 0.42) e = 0.12 + Math.sin(time * 60) * 0.04;   // warning wiggle
+      else if (u < 0.48) e = (u - 0.42) / 0.06;
+      else if (u < 0.82) e = 1;
+      else if (u < 0.9) e = 1 - (u - 0.82) / 0.08;
+      else e = 0;
+      h.ext = e;
+      h.spikeGroup.position.y = -0.6 + e * 0.6;
+    } else {
+      const a = time * h.speed + h.phase;
+      h.off = Math.sin(a) * h.amp;
+      h.holder.position.z = h.off;
+      h.spinner.rotation.x += dt * 14 * (Math.cos(a) >= 0 ? 1 : -1);
+    }
+  }
+}
+
+function checkHazards() {
+  for (const h of hazards) {
+    if (h.type === 'spikes') {
+      const d = Math.hypot(P.x - h.isl.x, P.z - h.isl.z);
+      if (h.ext > 0.5 && d < h.R + 0.2 && P.y < h.isl.y + h.ext * 0.5) return true;
+    } else if (sawHits(h)) return true;
+  }
+  return P.y < lowestY - 20;
+}
+
+// ---------- Day / night ----------
+const DAY_LENGTH = 200;          // seconds for a full cycle
+let dayT = 0.06;                 // start in the morning
+// t, sky, light color, light intensity, hemisphere intensity, night factor
+const KEYS = [
+  [0.00, 0xf3a683, 0xffa36c, 0.7, 0.55, 0.5],
+  [0.10, 0x9fd3f2, 0xffe6c0, 1.7, 0.9, 0.0],
+  [0.375, 0x6ec1f5, 0xffffff, 2.5, 1.1, 0.0],
+  [0.60, 0x8cc4e8, 0xffe0b0, 2.0, 0.95, 0.0],
+  [0.70, 0xf28b5b, 0xff8a4c, 1.1, 0.6, 0.25],
+  [0.77, 0x4a3470, 0x9a7cff, 0.4, 0.35, 0.9],
+  [0.86, 0x070b1f, 0x8fa6ff, 0.5, 0.2, 1.0],
+  [0.96, 0x0d1533, 0x8fa6ff, 0.45, 0.22, 1.0],
+  [1.00, 0xf3a683, 0xffa36c, 0.7, 0.55, 0.5],
+];
+const cA = new THREE.Color(), cB = new THREE.Color(), skyCol = new THREE.Color(), lightCol = new THREE.Color();
+const sunDir = new THREE.Vector3(), moonDir = new THREE.Vector3(), lightDir = new THREE.Vector3();
+let night = 0;
+
+function phaseName(t) {
+  if (t < 0.25) return '🌅 Утро';
+  if (t < 0.58) return '☀️ День';
+  if (t < 0.77) return '🌇 Вечер';
+  return '🌙 Ночь';
+}
+
+function updateEnv(dt) {
+  dayT = (dayT + (dt * (timeFast ? 18 : 1)) / DAY_LENGTH) % 1;
+  let i = 0;
+  while (KEYS[i + 1][0] < dayT) i++;
+  const a = KEYS[i], b = KEYS[i + 1];
+  const f = THREE.MathUtils.smoothstep(dayT, a[0], b[0]);
+  skyCol.lerpColors(cA.set(a[1]), cB.set(b[1]), f);
+  lightCol.lerpColors(cA.set(a[2]), cB.set(b[2]), f);
+  const li = THREE.MathUtils.lerp(a[3], b[3], f);
+  const hi = THREE.MathUtils.lerp(a[4], b[4], f);
+  night = THREE.MathUtils.lerp(a[5], b[5], f);
+
+  scene.background.copy(skyCol);
+  scene.fog.color.copy(skyCol);
+  hemi.color.copy(skyCol).lerp(cA.set(0xffffff), 0.5);
+  hemi.intensity = hi;
+  sun.color.copy(lightCol);
+  sun.intensity = li;
+
+  const se = Math.PI * (dayT + 0.02) / 0.79;
+  sunDir.set(Math.cos(se), Math.sin(se), 0.35).normalize();
+  const mt = (dayT + 0.26) % 1;          // moon rises in the evening
+  const me = Math.PI * mt / 0.5;
+  moonDir.set(-Math.cos(me), Math.sin(me), -0.3).normalize();
+  lightDir.copy(dayT < 0.76 ? sunDir : moonDir);
+  if (lightDir.y < 0.25) { lightDir.y = 0.25; lightDir.normalize(); }
+
+  sun.target.position.copy(P);
+  sun.position.copy(P).addScaledVector(lightDir, 60);
+
+  sunDisc.visible = sunDir.y > -0.08;
+  sunDisc.position.copy(camera.position).addScaledVector(sunDir, 380);
+  sunDisc.material.color.set(0xfff2b0).lerp(cA.set(0xff7a3c), 1 - THREE.MathUtils.clamp(sunDir.y * 3, 0, 1));
+  moonDisc.visible = moonDir.y > -0.08 && night > 0.2;
+  moonDisc.position.copy(camera.position).addScaledVector(moonDir, 380);
+
+  stars.position.copy(camera.position);
+  stars.material.opacity = night;
+
+  if (lamp) lamp.light.intensity = night * 22;
+  M.bulb.emissiveIntensity = 0.2 + night * 3.5;
+  glowMat.opacity = night * 0.9;
+}
+
+// ---------- Main loop ----------
+const camPos = new THREE.Vector3(), camTarget = new THREE.Vector3();
+let last = performance.now();
+let hudCache = '';
+
+buildLevel(level);
+respawn();
+camera.position.set(0, 4, 10);
+
+function update(dt) {
+  time += dt;
+  if (jumpQueued) { jumpBuf = 0.15; jumpQueued = false; }
+
+  let ix = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + joy.x;
+  let iz = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) + joy.y;
+  const il = Math.hypot(ix, iz);
+  if (il > 1) { ix /= il; iz /= il; }
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
+  const mx = fx * iz + rx * ix, mz = fz * iz + rz * ix;
+
+  updateHazards(dt);
+
+  if (transition > 0) {
+    transition -= dt;
+    if (transition <= 0) {
+      level++;
+      buildLevel(level);
+      respawn();
+      showMsg('Уровень ' + level, 2);
+    }
+  } else {
+    const sub = 3;
+    for (let s = 0; s < sub; s++) step(dt / sub, mx, mz, iz);
+    jumpBuf = Math.max(0, jumpBuf - dt);
+
+    if (checkHazards()) die();
+
+    if (portal) {
+      const d = Math.hypot(P.x - portal.isl.x, P.z - portal.isl.z);
+      if (d < 0.9 && P.y < portal.isl.y + 2.5) {
+        transition = 1.3;
+        showMsg('Уровень ' + level + ' пройден!', 1.3);
+      }
+    }
+  }
+
+  // Player visuals
+  const hs = Math.hypot(vel.x, vel.z);
+  if (hs > 0.5 && !climb) facing = Math.atan2(vel.x, vel.z);
+  let dYaw = facing - model.rotation.y;
+  dYaw = Math.atan2(Math.sin(dYaw), Math.cos(dYaw));
+  model.rotation.y += dYaw * Math.min(1, dt * 14);
+  player.position.copy(P);
+  const bob = climb ? Math.sin(climbAnim) * 0.05 : grounded ? Math.abs(Math.sin(time * 13)) * 0.08 * Math.min(1, hs / SPEED) : 0;
+  model.position.y = bob;
+  model.scale.y = grounded || climb ? 1 : 1 + THREE.MathUtils.clamp(vel.y * 0.015, -0.1, 0.1);
+
+  // Portal animation
+  if (portal) {
+    portal.disc.rotation.z += dt * 1.5;
+    M.portalDisc.opacity = 0.45 + Math.sin(time * 3) * 0.15;
+    portal.sparks.forEach((s, i) => {
+      const a = time * 1.6 + (i / portal.sparks.length) * Math.PI * 2;
+      s.position.set(Math.cos(a) * 1.25, 1.55 + Math.sin(a) * 1.25, Math.sin(time * 3 + i) * 0.25);
+      s.rotation.y += dt * 3;
+    });
+  }
+
+  if (msgTimer > 0) { msgTimer -= dt; if (msgTimer <= 0) $('msg').style.opacity = 0; }
+}
+
+function updateCamera(dt) {
+  camTarget.set(P.x, P.y + 1.3, P.z);
+  const dist = 7.5;
+  camPos.set(
+    P.x + Math.sin(yaw) * Math.cos(pitch) * dist,
+    P.y + 1.3 + Math.sin(pitch) * dist,
+    P.z + Math.cos(yaw) * Math.cos(pitch) * dist);
+  // Don't let the camera dip inside the island the player stands on
+  for (const isl of islands) {
+    if (Math.hypot(camPos.x - isl.x, camPos.z - isl.z) < isl.r + 0.5 && camPos.y < isl.y + 0.5 && camPos.y > isl.y - 3) camPos.y = isl.y + 0.5;
+  }
+  camera.position.lerp(camPos, Math.min(1, dt * 10));
+  camera.lookAt(camTarget);
+}
+
+function updateClouds(dt) {
+  for (const c of clouds) {
+    c.position.x += dt * 1.2;
+    if (c.position.x - P.x > 120) c.position.x -= 240;
+    if (c.position.x - P.x < -120) c.position.x += 240;
+    if (c.position.z - P.z > 120) c.position.z -= 240;
+    if (c.position.z - P.z < -120) c.position.z += 240;
+  }
+  sea.position.x = P.x; sea.position.z = P.z;
+}
+
+function updateHud() {
+  const html = `<b>Уровень ${level}</b><br>${phaseName(dayT)}<br>Падений: ${deaths}`;
+  if (html !== hudCache) { $('hud').innerHTML = html; hudCache = html; }
+}
+
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+  if (started) update(dt);
+  else updateHazards(dt);
+  updateCamera(dt);
+  updateEnv(dt);
+  updateClouds(dt);
+  updateHud();
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

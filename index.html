@@ -24,6 +24,23 @@
   #knob { position: absolute; left: 40px; top: 40px; width: 50px; height: 50px; border-radius: 50%; background: #fff8; }
   #jumpBtn { position: fixed; right: 28px; bottom: 34px; width: 86px; height: 86px; border-radius: 50%; background: #ffcf4a99; border: 2px solid #fff8; color: #fff; font-weight: 800; display: flex; align-items: center; justify-content: center; touch-action: none; user-select: none; }
   #timeBtn { position: fixed; right: 30px; bottom: 136px; width: 56px; height: 56px; border-radius: 50%; background: #fff3; border: 2px solid #fff6; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 22px; touch-action: none; user-select: none; }
+  #swordBtn { position: fixed; right: 128px; bottom: 30px; width: 70px; height: 70px; border-radius: 50%; background: #c0392b99; border: 2px solid #fff8; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 30px; touch-action: none; user-select: none; }
+  #shopBtn { position: fixed; top: 12px; right: 12px; padding: 8px 14px; border-radius: 20px; background: #0006; border: 2px solid #fff6; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; z-index: 3; user-select: none; }
+  #shop { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: #000a; z-index: 6; color: #fff; }
+  #shop.open { display: flex; }
+  #shop .panel { width: min(520px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow: auto; box-sizing: border-box; padding: 22px; border-radius: 18px; background: #2a2340; border: 2px solid #ffcf4a88; box-shadow: 0 10px 40px #000a; }
+  #shop h2 { margin: 0 0 4px; font-size: 28px; }
+  #shop .wallet { font-size: 20px; margin-bottom: 14px; color: #ffd75a; font-weight: 700; }
+  .item { display: flex; gap: 12px; align-items: center; padding: 12px; margin-bottom: 10px; border-radius: 12px; background: #ffffff12; }
+  .item .ic { font-size: 34px; width: 44px; text-align: center; }
+  .item .tx { flex: 1; }
+  .item .nm { font-weight: 700; font-size: 17px; }
+  .item .ds { font-size: 13px; opacity: .8; }
+  .item button, #closeShop { border: 0; border-radius: 10px; padding: 9px 12px; font-weight: 800; font-size: 14px; cursor: pointer; background: #ffcf4a; color: #332; white-space: nowrap; }
+  .item button:disabled { background: #666; color: #bbb; cursor: default; }
+  .item button.on { background: #4cd07d; color: #062; }
+  .item button.off { background: #888; color: #fff; }
+  #closeShop { width: 100%; margin-top: 6px; padding: 12px; background: #ffffff22; color: #fff; }
 </style>
 <script type="importmap">
   { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
@@ -31,21 +48,31 @@
 </head>
 <body>
 <div id="hud"></div>
-<div id="help">WASD / стрелки — бег · Пробел — прыжок · W/S у лестницы — лезть · Мышь — камера · T (держать) — ускорить время</div>
+<div id="help">WASD — бег · Пробел — прыжок · W/S у лестницы — лезть · ЛКМ / J — удар мечом · B — магазин · T (держать) — ускорить время</div>
 <div id="msg"></div>
 <div id="flash"></div>
+<div id="shopBtn">🛒 Магазин</div>
 <div id="touch">
   <div id="joy"><div id="knob"></div></div>
   <div id="jumpBtn">ПРЫЖОК</div>
+  <div id="swordBtn">🗡️</div>
   <div id="timeBtn">⏩</div>
+</div>
+<div id="shop">
+  <div class="panel">
+    <h2>Магазин</h2>
+    <div class="wallet">🪙 <span id="shopCoins">0</span></div>
+    <div id="items"></div>
+    <button id="closeShop">Закрыть</button>
+  </div>
 </div>
 <div id="start">
   <div class="box">
     <h1>Небесные острова</h1>
     <p>Прыгай с острова на остров, забирайся по лестницам на высокие острова.</p>
-    <p>Берегись шипов, выскакивающих из земли, и летающих пил.</p>
-    <p>На последнем острове — портал на следующий уровень.</p>
-    <p>Время суток меняется: утро, день, вечер, ночь.</p>
+    <p>Берегись шипов, летающих пил и красных крабов — их можно победить деревянным мечом (3 удара).</p>
+    <p>На ледяных островах скользко! Собирай монетки и покупай снаряжение в магазине.</p>
+    <p>На уровень даётся 5 жизней. На последнем острове — портал на следующий уровень.</p>
     <div class="go">Играть</div>
   </div>
 </div>
@@ -126,7 +153,38 @@ const M = {
   portalDisc: new THREE.MeshBasicMaterial({ color: 0xb79bff, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false }),
   cloud: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }),
   body: std(0x3b82f6), skin: std(0xffd7b0), eye: new THREE.MeshBasicMaterial({ color: 0x111111 }),
+  ice: new THREE.MeshStandardMaterial({ color: 0xcdefff, roughness: 0.12, metalness: 0.15, flatShading: true }),
+  iceRock: std(0x86b4d8), icicle: new THREE.MeshStandardMaterial({ color: 0xe8f8ff, roughness: 0.1, transparent: true, opacity: 0.85, flatShading: true }),
+  sand: std(0xe6d09a), shell: std(0xffb3a0),
+  coin: new THREE.MeshStandardMaterial({ color: 0xffc928, emissive: 0x7a5200, emissiveIntensity: 0.35, roughness: 0.3, metalness: 0.9 }),
+  coinRim: new THREE.MeshStandardMaterial({ color: 0xe0a800, emissive: 0x5a3c00, emissiveIntensity: 0.3, roughness: 0.35, metalness: 0.9 }),
+  crab: std(0xe0362a), white: std(0xffffff),
+  swordWood: std(0xc08a4a), swordGrip: std(0x5a3a1a), boots: std(0x7a2e1a),
+  lanternGlow: new THREE.MeshStandardMaterial({ color: 0xffe2a0, emissive: 0xffb84a, emissiveIntensity: 2 }),
 };
+
+// ---------- Save (wallet + shop items persist between sessions) ----------
+const SAVE_KEY = 'skyIslands.save.v1';
+const save = { coins: 0, owned: {}, on: {} };
+try { Object.assign(save, JSON.parse(localStorage.getItem(SAVE_KEY)) || {}); } catch {}
+function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch {} }
+const has = (id) => !!save.owned[id] && save.on[id] !== false;
+
+// ---------- Sound ----------
+let actx = null;
+function sfx(freq, dur = 0.1, type = 'square', vol = 0.04, slide = 1) {
+  try {
+    actx ||= new AudioContext();
+    const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t);
+    o.frequency.exponentialRampToValueAtTime(freq * slide, t + dur);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(actx.destination);
+    o.start(t); o.stop(t + dur);
+  } catch {}
+}
 
 const shadowy = (mesh) => { mesh.castShadow = true; mesh.receiveShadow = true; return mesh; };
 
@@ -164,27 +222,29 @@ for (let i = 0; i < 16; i++) {
 // ---------- Level state ----------
 let levelGroup = new THREE.Group();
 scene.add(levelGroup);
-let islands = [], ladders = [], hazards = [], obstacles = [], portal = null, lamp = null;
+let islands = [], ladders = [], hazards = [], obstacles = [], coins = [], crabs = [], portal = null, lamp = null;
 let level = 1, lowestY = 0;
 const spawn = new THREE.Vector3(0, 0, 2);
 
 function clearLevel() {
-  levelGroup.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+  levelGroup.traverse((o) => { if (o.geometry && !o.geometry.userData.shared) o.geometry.dispose(); });
+  for (const c of crabs) c.mat.dispose();
   scene.remove(levelGroup);
   levelGroup = new THREE.Group();
   scene.add(levelGroup);
-  islands = []; ladders = []; hazards = []; obstacles = []; portal = null; lamp = null;
+  islands = []; ladders = []; hazards = []; obstacles = []; coins = []; crabs = []; portal = null; lamp = null;
 }
 
 function makeIsland(x, y, z, r, kind, rng) {
   const g = new THREE.Group();
   g.position.set(x, y, z);
   const seg = Math.max(10, Math.round(r * 4));
-  const grassMat = kind === 'start' ? M.grassStart : kind === 'end' ? M.grassEnd : M.grass;
+  const grassMat = { start: M.grassStart, end: M.grassEnd, ice: M.ice, arena: M.sand }[kind] || M.grass;
+  const dirtMat = kind === 'ice' ? M.iceRock : M.dirt;
 
   const grass = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.98, 0.35, seg), grassMat));
   grass.position.y = -0.175;
-  const dirt = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(r * 0.98, r * 0.92, 0.7, seg), M.dirt));
+  const dirt = shadowy(new THREE.Mesh(new THREE.CylinderGeometry(r * 0.98, r * 0.92, 0.7, seg), dirtMat));
   dirt.position.y = -0.7;
 
   const coneH = r * 1.3;
@@ -197,7 +257,7 @@ function makeIsland(x, y, z, r, kind, rng) {
     pa.setXYZ(i, vx + j, vy + j * 0.5, vz - j);
   }
   coneGeo.computeVertexNormals();
-  const cone = shadowy(new THREE.Mesh(coneGeo, M.dirt));
+  const cone = shadowy(new THREE.Mesh(coneGeo, dirtMat));
   cone.rotation.x = Math.PI;
   cone.position.y = -1.05 - coneH / 2;
   g.add(grass, dirt, cone);
@@ -209,7 +269,32 @@ function makeIsland(x, y, z, r, kind, rng) {
     rock.position.set(Math.cos(a) * d, -1.4 - rng() * coneH * 0.4, Math.sin(a) * d);
     g.add(rock);
   }
-  const tufts = Math.round(r * 2);
+  if (kind === 'ice') {
+    // Icicles under the rim and a few crystals on top
+    for (let i = 0; i < Math.round(r * 3); i++) {
+      const a = (i / Math.round(r * 3)) * Math.PI * 2 + rng() * 0.3, h = 0.4 + rng() * 0.8;
+      const ic = new THREE.Mesh(new THREE.ConeGeometry(0.12, h, 5), M.icicle);
+      ic.rotation.x = Math.PI;
+      ic.position.set(Math.cos(a) * r * 0.9, -1.05 - h / 2, Math.sin(a) * r * 0.9);
+      g.add(ic);
+    }
+    for (let i = 0; i < 3; i++) {
+      const a = rng() * Math.PI * 2, d = r * (0.7 + rng() * 0.2);
+      const cr = shadowy(new THREE.Mesh(new THREE.OctahedronGeometry(0.18 + rng() * 0.12, 0), M.icicle));
+      cr.position.set(Math.cos(a) * d, 0.18, Math.sin(a) * d);
+      cr.scale.y = 1.8;
+      g.add(cr);
+    }
+  }
+  if (kind === 'arena') {
+    for (let i = 0; i < 6; i++) {
+      const a = rng() * Math.PI * 2, d = r * (0.3 + rng() * 0.6);
+      const sh = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.1, 6), M.shell);
+      sh.position.set(Math.cos(a) * d, 0.05, Math.sin(a) * d);
+      g.add(sh);
+    }
+  }
+  const tufts = kind === 'ice' || kind === 'arena' ? 0 : Math.round(r * 2);
   for (let i = 0; i < tufts; i++) {
     const a = rng() * Math.PI * 2, d = r * (0.55 + rng() * 0.4);
     const isFlower = rng() < 0.35;
@@ -418,6 +503,70 @@ function makeStartDecor(isl) {
   lamp = { light };
 }
 
+// Shared geometry for things spawned many times (kept across levels)
+const shared = (g) => { g.userData.shared = true; return g; };
+const coinGeo = shared(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 22));
+const coinFaceGeo = shared(new THREE.CylinderGeometry(0.21, 0.21, 0.08, 22));
+
+function makeCoin(x, y, z) {
+  const g = new THREE.Group();
+  const disc = new THREE.Mesh(coinGeo, M.coin);
+  const face = new THREE.Mesh(coinFaceGeo, M.coinRim);
+  disc.rotation.x = face.rotation.x = Math.PI / 2;
+  disc.castShadow = true;
+  g.add(disc, face);
+  g.position.set(x, y, z);
+  g.rotation.y = Math.random() * Math.PI;
+  levelGroup.add(g);
+  coins.push({ mesh: g, x, y, z, phase: Math.random() * 6 });
+}
+
+function makeCrab(isl, x, z) {
+  const mat = M.crab.clone();
+  const g = new THREE.Group();
+  const body = shadowy(new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 8), mat));
+  body.scale.set(1, 0.55, 0.8);
+  body.position.y = 0.42;
+  g.add(body);
+  for (const s of [-1, 1]) {
+    const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.26, 5), mat);
+    stalk.position.set(s * 0.15, 0.75, 0.22);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), M.white);
+    eye.position.set(s * 0.15, 0.9, 0.24);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 4), M.eye);
+    pupil.position.set(s * 0.15, 0.91, 0.31);
+    g.add(stalk, eye, pupil);
+  }
+  const claws = [];
+  for (const s of [-1, 1]) {
+    const arm = new THREE.Group();
+    arm.position.set(s * 0.42, 0.42, 0.28);
+    arm.rotation.y = -s * 0.5;
+    const upper = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.11, 0.32), mat);
+    upper.position.z = 0.14;
+    const pincer = shadowy(new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), mat));
+    pincer.scale.set(0.9, 0.7, 1.25);
+    pincer.position.z = 0.4;
+    arm.add(upper, pincer);
+    g.add(arm);
+    claws.push(arm);
+  }
+  const legs = [];
+  for (const s of [-1, 1]) for (let k = 0; k < 3; k++) {
+    const pivot = new THREE.Group();
+    pivot.position.set(s * 0.38, 0.3, 0.12 - k * 0.2);
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.05, 0.05), mat);
+    leg.position.x = s * 0.19;
+    pivot.add(leg);
+    g.add(pivot);
+    legs.push({ pivot, s, k });
+  }
+  g.position.set(x, isl.y, z);
+  levelGroup.add(g);
+  crabs.push({ isl, mesh: g, mat, claws, legs, x, z, vx: 0, vz: 0, hp: 3, hitT: 0, stun: 0, dead: 0,
+    face: Math.random() * 6, tx: x, tz: z, wanderT: 0, anim: Math.random() * 6 });
+}
+
 function buildLevel(n) {
   clearLevel();
   const rng = mulberry32(n * 1013 + 7);
@@ -432,7 +581,9 @@ function buildLevel(n) {
     heading = THREE.MathUtils.clamp(heading + (rng() - 0.5) * 1.1, base - 1.1, base + 1.1);
     const dx = Math.cos(heading), dz = Math.sin(heading);
     const last = i === count;
-    const r = last ? 4.5 : 2.3 + rng() * 1.5;
+    // Bigger beach islands with crabs on them
+    const arena = !last && (i === Math.floor(count * 0.45) || (n >= 2 && i === Math.floor(count * 0.8)));
+    const r = last ? 4.5 : arena ? 5.3 + rng() * 0.8 : 2.3 + rng() * 1.5;
     const ladder = !last && i > 1 && (rng() < 0.3 || (i === Math.floor(count / 2) && ladderCount === 0));
     let dist, dy;
     if (ladder) {
@@ -443,7 +594,8 @@ function buildLevel(n) {
       dy = -1.6 + rng() * 2.4;                  // at most +0.8 up: reachable with a jump
       dist = prev.r + r + 1.3 + rng() * (1.0 + Math.min(n, 6) * 0.2);
     }
-    specs.push({ x: prev.x + dx * dist, y: prev.y + dy, z: prev.z + dz * dist, r, kind: last ? 'end' : 'normal' });
+    const kind = last ? 'end' : arena ? 'arena' : i > 1 && rng() < 0.22 ? 'ice' : 'normal';
+    specs.push({ x: prev.x + dx * dist, y: prev.y + dy, z: prev.z + dz * dist, r, kind });
     links.push({ ladder, dx, dz });
   }
 
@@ -460,6 +612,7 @@ function buildLevel(n) {
   const spikePeriod = Math.max(2.0, 3.4 - n * 0.15);
   const sawSpeed = 1.3 + Math.min(n, 8) * 0.2;
   for (let i = 1; i < count; i++) {
+    if (specs[i].kind !== 'normal') continue;   // no traps on ice and crab islands
     if (links[i].ladder) continue;              // keep the ladder foot clear
     if (rng() > hazardChance) continue;
     const inc = links[i - 1];
@@ -469,6 +622,28 @@ function buildLevel(n) {
 
   const lastLink = links[links.length - 1];
   makePortal(islands[count], lastLink.dx, lastLink.dz);
+
+  // Coins on every island except the start one
+  for (let i = 1; i <= count; i++) {
+    const isl = islands[i];
+    const nC = { arena: 5, ice: 4, end: 2 }[isl.kind] || 1 + Math.floor(rng() * 3);
+    const a0 = rng() * Math.PI * 2;
+    for (let k = 0; k < nC; k++) {
+      const a = isl.kind === 'end' ? a0 + k * Math.PI : a0 + (k / nC) * Math.PI * 2;
+      const d = isl.kind === 'end' ? 2.6 : (isl.r - 0.8) * (0.45 + rng() * 0.5);
+      makeCoin(isl.x + Math.cos(a) * d, isl.y + 0.8, isl.z + Math.sin(a) * d);
+    }
+  }
+
+  // Crabs
+  const crabsPerIsland = Math.min(1 + Math.floor(n / 2), 4);
+  for (const isl of islands) {
+    if (isl.kind !== 'arena') continue;
+    for (let k = 0; k < crabsPerIsland; k++) {
+      const a = rng() * Math.PI * 2, d = 1 + rng() * (isl.r - 2);
+      makeCrab(isl, isl.x + Math.cos(a) * d, isl.z + Math.sin(a) * d);
+    }
+  }
 
   lowestY = Math.min(...specs.map((s) => s.y));
   sea.position.y = lowestY - 32;
@@ -490,26 +665,81 @@ const eyeL = new THREE.Mesh(eyeGeo, M.eye), eyeR = new THREE.Mesh(eyeGeo, M.eye)
 eyeL.position.set(-0.1, 1.3, 0.24); eyeR.position.set(0.1, 1.3, 0.24);
 const model = new THREE.Group();
 model.add(bodyMesh, head, cap, visor, eyeL, eyeR);
+
+// Wooden sword in the right hand
+const swordPivot = new THREE.Group();
+swordPivot.position.set(0.36, 0.78, 0.08);
+const blade = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.72, 0.035), M.swordWood));
+blade.position.y = 0.5;
+const tip = new THREE.Mesh(new THREE.ConeGeometry(0.064, 0.14, 4), M.swordWood);
+tip.position.y = 0.93;
+tip.rotation.y = Math.PI / 4;
+const guard = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.05, 0.07), M.swordGrip);
+guard.position.y = 0.13;
+const grip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.18, 0.05), M.swordGrip);
+grip.position.y = 0.03;
+swordPivot.add(blade, tip, guard, grip);
+model.add(swordPivot);
+
+// Double-jump boots
+const bootsGroup = new THREE.Group();
+for (const s of [-1, 1]) {
+  const boot = shadowy(new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.16, 0.3), M.boots));
+  boot.position.set(s * 0.13, 0.08, 0.05);
+  const wing = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.1, 0.16), M.white);
+  wing.position.set(s * 0.23, 0.14, -0.04);
+  wing.rotation.x = -0.4;
+  bootsGroup.add(boot, wing);
+}
+model.add(bootsGroup);
+
+// Lantern on the belt: soft light all around
+const lanternMesh = new THREE.Group();
+const lFrame = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.2, 0.15), M.iron);
+const lCore = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.15, 0.17), M.lanternGlow);
+lanternMesh.add(lFrame, lCore);
+lanternMesh.position.set(-0.36, 0.62, 0.05);
+model.add(lanternMesh);
+const lanternLight = new THREE.PointLight(0xffd59a, 0, 11, 1.3);
+lanternLight.position.set(0, 1.2, 0);
+player.add(lanternLight);
+
+// Flashlight in the left hand: a beam forward
+const flashMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.065, 0.28, 8), M.iron);
+flashMesh.rotation.x = Math.PI / 2;
+flashMesh.position.set(-0.34, 0.85, 0.28);
+model.add(flashMesh);
+const flashLight = new THREE.SpotLight(0xfff4dc, 0, 28, 0.42, 0.45, 1.1);
+flashLight.position.set(-0.34, 0.9, 0.4);
+flashLight.target.position.set(-0.3, 0, 9);
+model.add(flashLight, flashLight.target);
+
 player.add(model);
 scene.add(player);
 
 const P = new THREE.Vector3(), vel = new THREE.Vector3();
-let grounded = false, coyote = 0, jumpBuf = 0, climb = null, facing = Math.PI;
+let grounded = false, coyote = 0, jumpBuf = 0, climb = null, facing = Math.PI, groundIsl = null;
+let doubleUsed = false, invuln = 0, swingT = 0, swingCD = 0;
+let lives = 5, levelCoins = 0;
 const SPEED = 6.5, JUMP = 8.6, GRAV = 22, CLIMB = 3.2, PR = 0.32, PH = 1.6;
+const CRAB_SPEED = 5.0, MAX_LIVES = 5;
 
 function respawn() {
   P.copy(spawn); vel.set(0, 0, 0);
   climb = null; grounded = true; facing = Math.PI;
-  yaw = 0; pitch = 0.35;
+  yaw = 0; pitch = 0.35; invuln = 1;
 }
 
 // ---------- Input ----------
 const keys = {};
-let jumpQueued = false, timeFast = false;
+let jumpQueued = false, attackQueued = false, timeFast = false;
 addEventListener('keydown', (e) => {
   keys[e.code] = true;
   if (e.code === 'Space') { if (!e.repeat) jumpQueued = true; e.preventDefault(); }
   if (e.code === 'KeyT') timeFast = true;
+  if (e.code === 'KeyJ' && !e.repeat) attackQueued = true;
+  if (e.code === 'KeyB' && !e.repeat && started) toggleShop();
+  if (e.code === 'Escape' && shopOpen) toggleShop(false);
 });
 addEventListener('keyup', (e) => {
   keys[e.code] = false;
@@ -518,9 +748,11 @@ addEventListener('keyup', (e) => {
 
 let yaw = 0, pitch = 0.35, dragging = false;
 const canvas = renderer.domElement;
-canvas.addEventListener('mousedown', () => {
+canvas.addEventListener('mousedown', (e) => {
   dragging = true;
-  if (started && !isTouch && document.pointerLockElement !== canvas) canvas.requestPointerLock?.();
+  if (!started || isTouch) return;
+  if (document.pointerLockElement === canvas) { if (e.button === 0) attackQueued = true; }
+  else canvas.requestPointerLock?.();
 });
 addEventListener('mouseup', () => (dragging = false));
 addEventListener('mousemove', (e) => {
@@ -546,6 +778,7 @@ function moveJoy(t) {
   knob.style.transform = `translate(${x * 40}px, ${y * 40}px)`;
 }
 $('jumpBtn').addEventListener('touchstart', (e) => { jumpQueued = true; e.preventDefault(); }, { passive: false });
+$('swordBtn').addEventListener('touchstart', (e) => { attackQueued = true; e.preventDefault(); }, { passive: false });
 $('timeBtn').addEventListener('touchstart', (e) => { timeFast = true; e.preventDefault(); }, { passive: false });
 $('timeBtn').addEventListener('touchend', () => (timeFast = false));
 canvas.addEventListener('touchstart', (e) => {
@@ -570,7 +803,8 @@ addEventListener('touchend', (e) => {
 });
 
 // ---------- UI ----------
-let started = false, deaths = 0, transition = 0, msgTimer = 0;
+let started = false, msgTimer = 0, shopOpen = false;
+let pending = null;             // { t, fn }: a short pause (level done / game over) before fn runs
 function showMsg(text, sec = 2) { $('msg').textContent = text; $('msg').style.opacity = 1; msgTimer = sec; }
 $('start').addEventListener('click', () => {
   $('start').style.display = 'none';
@@ -579,12 +813,101 @@ $('start').addEventListener('click', () => {
   showMsg('Уровень ' + level, 2);
 });
 
-function die() {
-  deaths++;
-  $('flash').style.opacity = 0.55;
+function flash(color = '#d00', strength = 0.55) {
+  $('flash').style.background = color;
+  $('flash').style.opacity = strength;
   setTimeout(() => ($('flash').style.opacity = 0), 140);
-  respawn();
 }
+
+function addCoins(n) {
+  save.coins += n;
+  levelCoins += n;
+  persist();
+}
+
+// Lose one life. Traps and falls send you back to the start; a crab only knocks you away.
+function loseLife(backToStart, fromX = P.x, fromZ = P.z) {
+  if (pending) return;
+  lives--;
+  flash();
+  sfx(320, 0.35, 'sawtooth', 0.06, 0.3);
+  if (lives <= 0) {
+    showMsg('Жизни закончились!', 1.8);
+    pending = { t: 1.8, fn: () => {
+      // The level starts over and the coins found on this attempt are lost
+      save.coins = Math.max(0, save.coins - levelCoins);
+      persist();
+      startLevel(level);
+    } };
+    return;
+  }
+  if (backToStart) { respawn(); return; }
+  const dx = P.x - fromX, dz = P.z - fromZ, d = Math.hypot(dx, dz) || 1;
+  vel.set((dx / d) * 8, 5.5, (dz / d) * 8);
+  grounded = false;
+  invuln = 1.5;
+}
+
+function startLevel(n) {
+  level = n;
+  lives = MAX_LIVES;
+  levelCoins = 0;
+  buildLevel(level);
+  respawn();
+  showMsg('Уровень ' + level, 2);
+}
+
+// ---------- Shop ----------
+const ITEMS = [
+  { id: 'lantern', icon: '🏮', name: 'Фонарь', desc: 'Мягкий свет вокруг тебя — выручает ночью.', price: 10 },
+  { id: 'flashlight', icon: '🔦', name: 'Фонарик', desc: 'Яркий луч светит вперёд.', price: 15 },
+  { id: 'boots', icon: '👢', name: 'Ботинки двойного прыжка', desc: 'Ещё один прыжок прямо в воздухе.', price: 25 },
+];
+
+function renderShop() {
+  $('shopCoins').textContent = save.coins;
+  $('items').innerHTML = '';
+  for (const it of ITEMS) {
+    const row = document.createElement('div');
+    row.className = 'item';
+    row.innerHTML = `<div class="ic">${it.icon}</div><div class="tx"><div class="nm">${it.name}</div><div class="ds">${it.desc}</div></div>`;
+    const btn = document.createElement('button');
+    if (save.owned[it.id]) {
+      const on = save.on[it.id] !== false;
+      btn.textContent = on ? 'Включено' : 'Выключено';
+      btn.className = on ? 'on' : 'off';
+      btn.onclick = () => { save.on[it.id] = !on; persist(); renderShop(); };
+    } else {
+      btn.textContent = `Купить · ${it.price} 🪙`;
+      btn.disabled = save.coins < it.price;
+      btn.onclick = () => {
+        if (save.coins < it.price) return;
+        save.coins -= it.price;
+        levelCoins = Math.max(0, levelCoins - it.price);
+        save.owned[it.id] = true;
+        save.on[it.id] = true;
+        persist();
+        sfx(660, 0.25, 'triangle', 0.06, 2);
+        renderShop();
+      };
+    }
+    row.appendChild(btn);
+    $('items').appendChild(row);
+  }
+  const sword = document.createElement('div');
+  sword.className = 'item';
+  sword.innerHTML = '<div class="ic">🗡️</div><div class="tx"><div class="nm">Деревянный меч</div><div class="ds">Уже у тебя. Краб падает с трёх ударов (ЛКМ / J).</div></div>';
+  $('items').appendChild(sword);
+}
+
+function toggleShop(open = !shopOpen) {
+  shopOpen = open;
+  $('shop').classList.toggle('open', open);
+  if (open) { renderShop(); document.exitPointerLock?.(); }
+  for (const k in keys) keys[k] = false;
+}
+$('shopBtn').addEventListener('click', () => started && toggleShop());
+$('closeShop').addEventListener('click', () => toggleShop(false));
 
 // ---------- Physics ----------
 function nearLadderBottom(L) {
@@ -624,13 +947,21 @@ function step(dt, mx, mz, iz) {
     if (dot < -0.4 && nearLadderTop(L)) { climb = L; P.y = L.y1 - 0.4; return; }
   }
 
-  const k = Math.min(1, (grounded ? 16 : 7) * dt);
-  vel.x += (mx * SPEED - vel.x) * k;
-  vel.z += (mz * SPEED - vel.z) * k;
+  // On ice you barely grip: speed changes slowly, so you keep sliding
+  const onIce = grounded && groundIsl && groundIsl.kind === 'ice';
+  const k = Math.min(1, (onIce ? 1.6 : grounded ? 16 : 7) * dt);
+  const topSpeed = onIce ? SPEED * 1.15 : SPEED;
+  vel.x += (mx * topSpeed - vel.x) * k;
+  vel.z += (mz * topSpeed - vel.z) * k;
 
   coyote = grounded ? 0.1 : coyote - dt;
+  if (grounded) doubleUsed = false;
   if (jumpBuf > 0 && coyote > 0) {
     vel.y = JUMP; coyote = 0; jumpBuf = 0; grounded = false;
+    sfx(420, 0.12, 'sine', 0.05, 1.6);
+  } else if (jumpBuf > 0 && !grounded && has('boots') && !doubleUsed) {
+    vel.y = JUMP * 0.92; jumpBuf = 0; doubleUsed = true;
+    sfx(620, 0.15, 'sine', 0.05, 1.8);
   }
   vel.y = Math.max(vel.y - GRAV * dt, -30);
 
@@ -655,7 +986,7 @@ function step(dt, mx, mz, iz) {
   for (const isl of islands) {
     const d = Math.hypot(P.x - isl.x, P.z - isl.z);
     if (vel.y <= 0 && d < isl.r + 0.1 && y0 >= isl.y - 0.02 && P.y <= isl.y) {
-      P.y = isl.y; vel.y = 0; grounded = true; break;
+      P.y = isl.y; vel.y = 0; grounded = true; groundIsl = isl; break;
     }
     const under = isl.y - 1.05;
     if (vel.y > 0 && d < isl.r * 0.9 && y0 + PH <= under && P.y + PH > under) {
@@ -702,6 +1033,126 @@ function checkHazards() {
     } else if (sawHits(h)) return true;
   }
   return P.y < lowestY - 20;
+}
+
+function updateCoins(dt) {
+  for (let i = coins.length - 1; i >= 0; i--) {
+    const c = coins[i];
+    c.mesh.rotation.y += dt * 3;
+    c.mesh.position.y = c.y + Math.sin(time * 2.5 + c.phase) * 0.12;
+    const dx = P.x - c.x, dy = P.y + 0.8 - c.y, dz = P.z - c.z;
+    if (dx * dx + dy * dy + dz * dz < 0.85 * 0.85) {
+      levelGroup.remove(c.mesh);
+      coins.splice(i, 1);
+      addCoins(1);
+      sfx(990, 0.12, 'square', 0.035, 1.5);
+    }
+  }
+}
+
+function attack() {
+  if (swingCD > 0 || climb) return;
+  swingCD = 0.38; swingT = 0.3;
+  sfx(180, 0.12, 'triangle', 0.04, 2.5);
+  // Turn toward the nearest crab in reach so a swing rarely misses
+  let target = null, best = 2.3;
+  for (const c of crabs) {
+    if (c.dead || Math.abs(P.y - c.isl.y) > 1.2) continue;
+    const d = Math.hypot(c.x - P.x, c.z - P.z);
+    if (d < best) { best = d; target = c; }
+  }
+  if (target) facing = Math.atan2(target.x - P.x, target.z - P.z);
+  const fx = Math.sin(facing), fz = Math.cos(facing);
+  for (const c of crabs) {
+    if (c.dead || c.hitT > 0 || Math.abs(P.y - c.isl.y) > 1.2) continue;
+    const dx = c.x - P.x, dz = c.z - P.z, d = Math.hypot(dx, dz) || 1;
+    if (d > 1.9 || (d > 0.7 && (dx * fx + dz * fz) / d < 0.35)) continue;
+    c.hp--;
+    c.hitT = 0.18; c.stun = 0.45;
+    c.vx = (dx / d) * 7; c.vz = (dz / d) * 7;
+    sfx(140, 0.12, 'sawtooth', 0.05, 0.6);
+    if (c.hp <= 0) {
+      c.dead = 0.45;
+      sfx(500, 0.3, 'square', 0.04, 0.4);
+      for (let k = 0; k < 2; k++) makeCoin(c.x + (k - 0.5) * 0.8, c.isl.y + 0.8, c.z);
+    }
+  }
+}
+
+function updateCrabs(dt) {
+  for (let i = crabs.length - 1; i >= 0; i--) {
+    const c = crabs[i], isl = c.isl;
+    if (c.dead) {
+      c.dead -= dt;
+      c.mesh.scale.setScalar(Math.max(0.01, c.dead / 0.45));
+      c.mesh.rotation.z += dt * 8;
+      if (c.dead <= 0) { levelGroup.remove(c.mesh); c.mat.dispose(); crabs.splice(i, 1); }
+      continue;
+    }
+    c.hitT -= dt; c.stun -= dt; c.anim += dt;
+    const playerHere = !climb && !pending && Math.hypot(P.x - isl.x, P.z - isl.z) < isl.r + 0.3 && Math.abs(P.y - isl.y) < 1.6;
+    let spd;
+    if (playerHere) { c.tx = P.x; c.tz = P.z; spd = CRAB_SPEED; }
+    else {
+      c.wanderT -= dt;
+      if (c.wanderT <= 0) {
+        const a = Math.random() * Math.PI * 2, d = Math.random() * (isl.r - 1.2);
+        c.tx = isl.x + Math.cos(a) * d; c.tz = isl.z + Math.sin(a) * d;
+        c.wanderT = 2 + Math.random() * 2;
+      }
+      spd = 1.3;
+    }
+    let dx = c.tx - c.x, dz = c.tz - c.z;
+    const dist = Math.hypot(dx, dz);
+    let wx = 0, wz = 0;
+    if (c.stun <= 0 && dist > 0.35) { wx = (dx / dist) * spd; wz = (dz / dist) * spd; }
+    const k = Math.min(1, (c.stun > 0 ? 3 : 8) * dt);
+    c.vx += (wx - c.vx) * k; c.vz += (wz - c.vz) * k;
+    // Keep crabs apart from each other
+    for (const o of crabs) {
+      if (o === c || o.dead) continue;
+      const ox = c.x - o.x, oz = c.z - o.z, od = Math.hypot(ox, oz);
+      if (od < 1.1 && od > 1e-4) { c.x += (ox / od) * (1.1 - od) * 0.5; c.z += (oz / od) * (1.1 - od) * 0.5; }
+    }
+    c.x += c.vx * dt; c.z += c.vz * dt;
+    // Crabs never leave their island
+    const ex = c.x - isl.x, ez = c.z - isl.z, ed = Math.hypot(ex, ez), lim = isl.r - 0.6;
+    if (ed > lim) { c.x = isl.x + (ex / ed) * lim; c.z = isl.z + (ez / ed) * lim; }
+
+    const moving = Math.hypot(c.vx, c.vz);
+    if (moving > 0.3 && c.stun <= 0) {
+      const want = Math.atan2(playerHere ? P.x - c.x : c.vx, playerHere ? P.z - c.z : c.vz);
+      let df = want - c.face; df = Math.atan2(Math.sin(df), Math.cos(df));
+      c.face += df * Math.min(1, dt * 10);
+    }
+    c.mesh.position.set(c.x, isl.y + Math.abs(Math.sin(c.anim * 18)) * 0.04 * Math.min(1, moving), c.z);
+    c.mesh.rotation.y = c.face;
+    for (const L of c.legs) L.pivot.rotation.z = -L.s * (0.55 + Math.sin(c.anim * 22 + L.k * 2 + L.s) * 0.3 * Math.min(1, moving));
+    c.claws.forEach((arm, j) => (arm.rotation.x = playerHere ? Math.sin(c.anim * 9 + j * 3) * 0.35 : 0));
+    c.mat.emissive.setScalar(c.hitT > 0 ? 0.9 : 0);
+
+    if (playerHere && invuln <= 0 && c.stun <= 0 && Math.hypot(P.x - c.x, P.z - c.z) < 0.85 && P.y < isl.y + 0.9) {
+      loseLife(false, c.x, c.z);
+    }
+  }
+}
+
+function updateEquipment(dt) {
+  const lan = has('lantern'), fl = has('flashlight');
+  lanternMesh.visible = lan;
+  lanternLight.intensity = lan ? 6 + night * 16 : 0;
+  flashMesh.visible = fl;
+  flashLight.intensity = fl ? 30 + night * 70 : 0;
+  bootsGroup.visible = !!save.owned.boots;
+
+  swingCD = Math.max(0, swingCD - dt);
+  if (swingT > 0) {
+    swingT = Math.max(0, swingT - dt);
+    const u = 1 - swingT / 0.3;
+    swordPivot.rotation.x = u < 0.3 ? THREE.MathUtils.lerp(0.35, -0.9, u / 0.3) : THREE.MathUtils.lerp(-0.9, 1.8, (u - 0.3) / 0.7);
+  } else {
+    swordPivot.rotation.x += (0.35 - swordPivot.rotation.x) * Math.min(1, dt * 12);
+  }
 }
 
 // ---------- Day / night ----------
@@ -786,6 +1237,7 @@ camera.position.set(0, 4, 10);
 function update(dt) {
   time += dt;
   if (jumpQueued) { jumpBuf = 0.15; jumpQueued = false; }
+  invuln = Math.max(0, invuln - dt);
 
   let ix = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + joy.x;
   let iz = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) + joy.y;
@@ -796,29 +1248,30 @@ function update(dt) {
 
   updateHazards(dt);
 
-  if (transition > 0) {
-    transition -= dt;
-    if (transition <= 0) {
-      level++;
-      buildLevel(level);
-      respawn();
-      showMsg('Уровень ' + level, 2);
-    }
+  if (pending) {
+    pending.t -= dt;
+    if (pending.t <= 0) { const fn = pending.fn; pending = null; fn(); }
   } else {
     const sub = 3;
     for (let s = 0; s < sub; s++) step(dt / sub, mx, mz, iz);
     jumpBuf = Math.max(0, jumpBuf - dt);
+    if (attackQueued) attack();
 
-    if (checkHazards()) die();
+    if (checkHazards()) loseLife(true);
+    updateCoins(dt);
 
-    if (portal) {
+    if (portal && !pending) {
       const d = Math.hypot(P.x - portal.isl.x, P.z - portal.isl.z);
       if (d < 0.9 && P.y < portal.isl.y + 2.5) {
-        transition = 1.3;
         showMsg('Уровень ' + level + ' пройден!', 1.3);
+        sfx(520, 0.5, 'triangle', 0.06, 2);
+        pending = { t: 1.3, fn: () => startLevel(level + 1) };
       }
     }
   }
+  attackQueued = false;
+  updateCrabs(dt);
+  updateEquipment(dt);
 
   // Player visuals
   const hs = Math.hypot(vel.x, vel.z);
@@ -830,6 +1283,8 @@ function update(dt) {
   const bob = climb ? Math.sin(climbAnim) * 0.05 : grounded ? Math.abs(Math.sin(time * 13)) * 0.08 * Math.min(1, hs / SPEED) : 0;
   model.position.y = bob;
   model.scale.y = grounded || climb ? 1 : 1 + THREE.MathUtils.clamp(vel.y * 0.015, -0.1, 0.1);
+  const shown = invuln <= 0 || Math.floor(time * 12) % 2 === 0;
+  for (const o of [bodyMesh, head, cap, visor, eyeL, eyeR]) o.visible = shown;
 
   // Portal animation
   if (portal) {
@@ -872,7 +1327,8 @@ function updateClouds(dt) {
 }
 
 function updateHud() {
-  const html = `<b>Уровень ${level}</b><br>${phaseName(dayT)}<br>Падений: ${deaths}`;
+  const hearts = '❤️'.repeat(Math.max(0, lives)) + '🖤'.repeat(MAX_LIVES - Math.max(0, lives));
+  const html = `<b>Уровень ${level}</b><br>${phaseName(dayT)}<br>${hearts}<br>🪙 ${save.coins}`;
   if (html !== hudCache) { $('hud').innerHTML = html; hudCache = html; }
 }
 
@@ -880,8 +1336,8 @@ function loop(now) {
   requestAnimationFrame(loop);
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
-  if (started) update(dt);
-  else updateHazards(dt);
+  if (started && !shopOpen) update(dt);
+  else if (!started) updateHazards(dt);
   updateCamera(dt);
   updateEnv(dt);
   updateClouds(dt);

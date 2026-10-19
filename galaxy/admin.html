@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Пульт освещения</title>
+<style>
+  :root { --bg: #070a16; --panel: #0e1428; --line: #232c4d; --text: #e0e6ff; --muted: #8b97bd; --accent: #8fb4ff; --ok: #7be0a6; --bad: #ff8a8a; --warn: #ffcf7a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 20px 16px 40px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+  .sub { color: var(--muted); margin-bottom: 18px; }
+  .sub a { color: var(--accent); }
+  .grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  button, input, select { font: inherit; color: inherit; }
+  button { background: rgba(143,180,255,.12); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+  button:hover { background: rgba(143,180,255,.24); }
+  button.on { border-color: var(--accent); background: rgba(143,180,255,.3); }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .row { margin: 12px 0; }
+  .row label { display: flex; justify-content: space-between; margin-bottom: 3px; }
+  .row label span { color: var(--accent); font-variant-numeric: tabular-nums; }
+  .row input[type=range] { width: 100%; accent-color: var(--accent); }
+  .row.inline { display: flex; align-items: center; justify-content: space-between; }
+  .row.inline label { margin: 0; }
+  input[type=color] { width: 54px; height: 30px; border: 1px solid var(--line); border-radius: 6px; background: none; padding: 0; }
+  input[type=text], input[type=password], input[type=number] { background: #070b18; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; width: 100%; }
+  .status { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .status i { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+  .status.on i { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .status.bad i { background: var(--bad); }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; color: var(--muted); }
+  .kv b { color: var(--text); font-weight: 600; }
+  #log { font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; color: var(--muted); max-height: 180px; overflow: auto; white-space: pre-wrap; }
+  #log .err { color: var(--bad); }
+  pre { background: #070b18; border: 1px solid var(--line); border-radius: 8px; padding: 10px; overflow: auto; font-size: 12px; margin: 6px 0 0; }
+  .stack { display: grid; gap: 16px; align-content: start; }
+</style>
+</head>
+<body>
+<main>
+  <h1>💡 Пульт освещения</h1>
+  <div class="sub">Изменения сразу видят все, у кого открыта <a href="./" target="_blank">карта Млечного Пути</a>.</div>
+  <div class="grid">
+    <section class="card">
+      <h2>Пресеты</h2>
+      <div class="presets" id="presets"></div>
+      <div class="row inline"><label for="presetMs">Плавный переход для пресетов, мс</label>
+        <input id="presetMs" type="number" min="0" max="20000" step="100" value="1500" style="width:100px"></div>
+      <h2 style="margin-top:18px">Параметры</h2>
+      <div id="controls">Загрузка…</div>
+    </section>
+    <div class="stack">
+      <section class="card">
+        <div class="status" id="status"><i></i><span>Подключение…</span></div>
+        <div class="kv">
+          <span>Зрителей</span><b id="viewers">—</b>
+          <span>Пультов</span><b id="admins">—</b>
+          <span>Пресет</span><b id="preset">—</b>
+          <span>Версия</span><b id="rev">—</b>
+        </div>
+        <div class="row" id="tokenRow" hidden>
+          <label for="token">Токен администратора</label>
+          <input id="token" type="password" placeholder="ADMIN_TOKEN сервера" autocomplete="off">
+        </div>
+      </section>
+      <section class="card">
+        <h2>Журнал</h2>
+        <div id="log"></div>
+      </section>
+      <section class="card">
+        <h2>Из командной строки</h2>
+        <pre id="curl"></pre>
+      </section>
+    </div>
+  </div>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+let SCHEMA = {}, PRESETS = {}, state = {}, needsToken = false;
+const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+
+function log(msg, err) {
+  const line = document.createElement('div'); if (err) line.className = 'err';
+  line.textContent = new Date().toLocaleTimeString('ru-RU') + '  ' + msg;
+  $('#log').prepend(line);
+  while ($('#log').children.length > 80) $('#log').lastChild.remove();
+}
+
+async function call(method, path, body) {
+  const headers = { 'Content-Type': 'application/json', 'X-Source': 'admin' };
+  const tok = $('#token').value.trim(); if (tok) headers.Authorization = 'Bearer ' + tok;
+  const res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { log(`${res.status}: ${data.error || 'ошибка'}`, true); if (res.status === 401) $('#tokenRow').hidden = false; throw new Error(data.error); }
+  (data.errors || []).forEach(e => log(e, true));
+  return data;
+}
+
+// изменения ползунков копим и отправляем не чаще ~12 раз в секунду
+let pending = {}, timer = null;
+function queue(k, v) {
+  pending[k] = v;
+  if (timer) return;
+  timer = setTimeout(async () => {
+    const body = { ...pending, transition: 150 }; pending = {}; timer = null;
+    try { await call('PATCH', 'api/lighting', body); } catch {}
+  }, 80);
+}
+
+function build() {
+  const box = $('#controls'); box.innerHTML = '';
+  for (const [k, f] of Object.entries(SCHEMA)) {
+    const row = document.createElement('div'); const id = 'c_' + k;
+    if (f.type === 'bool') { row.className = 'row inline'; row.innerHTML = `<label for="${id}">${f.label}</label><input id="${id}" type="checkbox">`; }
+    else if (f.type === 'color') { row.className = 'row inline'; row.innerHTML = `<label for="${id}">${f.label}</label><input id="${id}" type="color">`; }
+    else { row.className = 'row'; row.innerHTML = `<label for="${id}">${f.label}<span></span></label><input id="${id}" type="range" min="${f.min}" max="${f.max}" step="${f.step}">`; }
+    box.appendChild(row);
+    const inp = row.querySelector('input');
+    inp.addEventListener('input', () => {
+      const v = f.type === 'bool' ? inp.checked : f.type === 'color' ? inp.value : Number(inp.value);
+      if (!f.type) inp.previousElementSibling.querySelector('span').textContent = v.toFixed(2);
+      queue(k, v);
+    });
+  }
+  const pr = $('#presets'); pr.innerHTML = '';
+  for (const [name, p] of Object.entries(PRESETS)) {
+    const b = document.createElement('button'); b.textContent = p.label; b.dataset.name = name;
+    b.onclick = () => call('POST', 'api/lighting/preset/' + name, { transition: Number($('#presetMs').value) || 0 }).then(() => log('пресет «' + p.label + '»')).catch(() => {});
+    pr.appendChild(b);
+  }
+  const r = document.createElement('button'); r.textContent = '↺ Сброс';
+  r.onclick = () => call('POST', 'api/lighting/reset', { transition: Number($('#presetMs').value) || 0 }).then(() => log('сброс')).catch(() => {});
+  pr.appendChild(r);
+}
+
+function show(s) {
+  state = s;
+  for (const [k, f] of Object.entries(SCHEMA)) {
+    const inp = document.getElementById('c_' + k); if (!inp || k in pending) continue;
+    if (document.activeElement === inp && !f.type) continue; // не дёргаем ползунок под пальцем
+    if (f.type === 'bool') inp.checked = !!s[k];
+    else { inp.value = s[k]; if (!f.type) inp.previousElementSibling.querySelector('span').textContent = Number(s[k]).toFixed(2); }
+  }
+  document.querySelectorAll('#presets button[data-name]').forEach(b => b.classList.toggle('on', b.dataset.name === s.preset));
+  $('#preset').textContent = PRESETS[s.preset] ? PRESETS[s.preset].label : 'свой';
+  $('#rev').textContent = s.rev;
+}
+
+function curl() {
+  const o = location.origin, auth = needsToken ? ' -H "Authorization: Bearer $ADMIN_TOKEN"' : '';
+  $('#curl').textContent = [
+    '# изменить параметры',
+    `curl -X PATCH ${o}/api/lighting${auth} \\`,
+    `  -H "Content-Type: application/json" -d '{"exposure":1.4,"bloom":2,"transition":2000}'`,
+    '', '# применить пресет',
+    `curl -X POST ${o}/api/lighting/preset/eclipse${auth}`,
+    '', '# запретить зрителям менять свет',
+    `curl -X PATCH ${o}/api/lighting${auth} -d lockClients=true`,
+    '', '# текущее состояние',
+    `curl ${o}/api/lighting`,
+  ].join('\n');
+}
+
+async function init() {
+  $('#token').value = store.get('lightToken') || '';
+  $('#token').addEventListener('change', e => store.set('lightToken', e.target.value.trim()));
+  const cfg = await (await fetch('api/config')).json();
+  SCHEMA = cfg.schema; PRESETS = cfg.presets; needsToken = cfg.auth;
+  if (needsToken) $('#tokenRow').hidden = false;
+  build(); curl();
+
+  const es = new EventSource('api/events?role=admin');
+  es.addEventListener('lighting', e => {
+    const m = JSON.parse(e.data); show(m.state);
+    $('#status').className = 'status on'; $('#status span').textContent = 'Сервер на связи';
+    if (m.source !== 'hello' && m.source !== 'admin') log(`изменено (${m.source})`);
+  });
+  es.addEventListener('clients', e => { const c = JSON.parse(e.data); $('#viewers').textContent = c.viewers; $('#admins').textContent = c.admins; });
+  es.onerror = () => { $('#status').className = 'status bad'; $('#status span').textContent = 'Нет связи с сервером, переподключаемся…'; };
+}
+init().catch(e => { $('#controls').textContent = 'Пульт работает только через server.js: ' + e.message; $('#status').className = 'status bad'; $('#status span').textContent = 'Сервер не найден'; });
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "schema": {
+    "exposure":         { "label": "Экспозиция",                  "min": 0.2, "max": 3,   "step": 0.01, "default": 1.0 },
+    "starLight":        { "label": "Свет звёзд в системах",       "min": 0,   "max": 5,   "step": 0.05, "default": 1.6 },
+    "ambient":          { "label": "Фоновый (рассеянный) свет",   "min": 0,   "max": 1.5, "step": 0.01, "default": 0.12 },
+    "galaxyBrightness": { "label": "Яркость галактики",           "min": 0,   "max": 3,   "step": 0.01, "default": 1.0 },
+    "coreGlow":         { "label": "Сияние ядра",                 "min": 0,   "max": 3,   "step": 0.01, "default": 1.0 },
+    "dust":             { "label": "Пылевые полосы",              "min": 0,   "max": 1,   "step": 0.01, "default": 0.6 },
+    "bloom":            { "label": "Свечение (bloom)",            "min": 0,   "max": 3,   "step": 0.01, "default": 0.9 },
+    "tint":             { "label": "Оттенок света",               "type": "color", "default": "#ffffff" },
+    "shadows":          { "label": "Тени от звёзд",               "type": "bool",  "default": true },
+    "lockClients":      { "label": "Запретить зрителям менять свет", "type": "bool", "default": false, "adminOnly": true }
+  },
+  "presets": {
+    "standard": { "label": "Стандарт",  "values": { "exposure": 1.0,  "starLight": 1.6, "ambient": 0.12, "galaxyBrightness": 1.0, "coreGlow": 1.0, "dust": 0.6,  "bloom": 0.9, "tint": "#ffffff", "shadows": true } },
+    "cinema":   { "label": "Кино",      "values": { "exposure": 1.15, "starLight": 2.2, "ambient": 0.04, "galaxyBrightness": 1.2, "coreGlow": 1.5, "dust": 0.85, "bloom": 1.6, "tint": "#ffe8d0", "shadows": true } },
+    "science":  { "label": "Научный",   "values": { "exposure": 1.1,  "starLight": 1.4, "ambient": 0.6,  "galaxyBrightness": 0.9, "coreGlow": 0.6, "dust": 0.4,  "bloom": 0.3, "tint": "#ffffff", "shadows": false } },
+    "night":    { "label": "Ночной",    "values": { "exposure": 0.6,  "starLight": 0.9, "ambient": 0.02, "galaxyBrightness": 0.6, "coreGlow": 0.5, "dust": 0.9,  "bloom": 0.7, "tint": "#c8d4ff", "shadows": true } },
+    "eclipse":  { "label": "Затмение",  "values": { "exposure": 0.8,  "starLight": 0.15,"ambient": 0.01, "galaxyBrightness": 1.1, "coreGlow": 1.8, "dust": 1.0,  "bloom": 1.5, "tint": "#ff9a6a", "shadows": true } },
+    "neon":     { "label": "Неон",      "values": { "exposure": 1.2,  "starLight": 2.5, "ambient": 0.2,  "galaxyBrightness": 1.4, "coreGlow": 2.0, "dust": 0.3,  "bloom": 1.9, "tint": "#b48cff", "shadows": true } }
+  }
+}

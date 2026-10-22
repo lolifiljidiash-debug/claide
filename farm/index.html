@@ -24,7 +24,9 @@ body{font-family:'Press Start 2P',monospace;color:#4a2f1d;font-size:10px}
 #hotbar{display:flex;gap:6px;padding:6px}
 .slot{position:relative;width:52px;height:52px;background:#e6cf9f;border:3px solid #a8713f;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .slot.sel{border-color:#4a2f1d;background:#fff3d1;box-shadow:inset 0 0 0 2px #f2cc4c}
-.slot img{width:40px;height:40px;image-rendering:pixelated;pointer-events:none}
+.slot img{image-rendering:pixelated;pointer-events:none}
+.slot img.main{width:40px;height:40px}
+.slot img.mini{position:absolute;right:1px;top:1px;width:18px;height:18px;background:#fff3d1;border:1px solid #a8713f}
 .slot .num{position:absolute;left:3px;top:3px;font-size:7px;color:#a8713f}
 .slot .cnt{position:absolute;right:2px;bottom:3px;font-size:8px;color:#4a2f1d;text-shadow:1px 1px #fff6de}
 .slot .bar{position:absolute;left:5px;right:5px;bottom:3px;height:5px;background:#4a2f1d}
@@ -32,14 +34,15 @@ body{font-family:'Press Start 2P',monospace;color:#4a2f1d;font-size:10px}
 .slot.bagslot{margin-left:8px;background:#d9b77a}
 #modalWrap{position:fixed;inset:0;background:rgba(20,15,30,.5);display:flex;align-items:center;justify-content:center;padding:12px}
 #modalWrap.hidden{display:none}
-#modal{position:relative;width:min(480px,100%);max-height:92vh;overflow:auto;padding:16px 16px 12px}
+#modal{position:relative;width:min(500px,100%);max-height:92vh;overflow:auto;padding:16px 16px 12px}
 #modal h2{font-size:13px;margin:0 30px 10px 0;line-height:1.5}
-#modal .say{line-height:1.8;margin-bottom:10px;color:#6e4527}
+#modal h3{font-size:9px;margin:14px 0 6px;color:#a8713f;letter-spacing:1px}
+#modal .say{line-height:1.8;margin-bottom:6px;color:#6e4527}
 #modal .foot{line-height:1.8;margin-top:10px;font-size:9px;color:#6e4527}
 .row{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:2px dashed #d9bf8f}
 .row:last-child{border-bottom:none}
 .row img{width:32px;height:32px;image-rendering:pixelated;flex:none}
-.row .nm{flex:1;line-height:1.7}
+.row .nm{flex:1;line-height:1.7;min-width:0}
 .row small{display:block;font-size:8px;color:#8a6a4a}
 .row .pr{display:flex;align-items:center;gap:3px;white-space:nowrap}
 .row .pr img{width:16px;height:16px}
@@ -49,7 +52,7 @@ button.px:disabled{background:#b9b0a5;border-color:#7d756c;box-shadow:none;curso
 button.px.alt{background:#c58c55;border-color:#6e4527;box-shadow:inset -2px -2px 0 #a8713f,inset 2px 2px 0 #e0b07a;text-shadow:1px 1px #6e4527}
 button.px.red{background:#c4503c;border-color:#6e2a1e;box-shadow:inset -2px -2px 0 #9e3a2c,inset 2px 2px 0 #e07a62;text-shadow:1px 1px #6e2a1e}
 #closeBtn{position:absolute;right:10px;top:10px;padding:5px 8px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
 .cell{background:#e6cf9f;border:3px solid #a8713f;padding:8px 4px;text-align:center;line-height:1.6;font-size:8px}
 .cell img{width:40px;height:40px;image-rendering:pixelated;display:block;margin:0 auto 4px}
 .cell b{display:block;font-size:11px;color:#4a2f1d}
@@ -64,8 +67,9 @@ body.touch #help{display:none}
 #stick{position:fixed;left:calc(18px + env(safe-area-inset-left,0px));bottom:calc(110px + env(safe-area-inset-bottom,0px));width:120px;height:120px;border-radius:50%;background:rgba(243,227,193,.25);border:3px solid rgba(74,47,29,.5)}
 #knob{position:absolute;left:36px;top:36px;width:42px;height:42px;border-radius:50%;background:#f3e3c1;border:3px solid #4a2f1d}
 #actBtn{position:fixed;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(120px + env(safe-area-inset-bottom,0px));width:78px;height:78px;border-radius:50%;font:inherit;font-size:16px;background:#f2cc4c;border:4px solid #4a2f1d;color:#4a2f1d;box-shadow:inset -4px -4px 0 #c9962f}
+#qBtn{position:fixed;right:calc(104px + env(safe-area-inset-right,0px));bottom:calc(126px + env(safe-area-inset-bottom,0px));width:50px;height:50px;border-radius:50%;font:inherit;font-size:12px;background:#f3e3c1;border:3px solid #4a2f1d;color:#4a2f1d}
 @media (max-width:600px){
-  .slot{width:44px;height:44px}.slot img{width:32px;height:32px}
+  .slot{width:44px;height:44px}.slot img.main{width:32px;height:32px}.slot img.mini{width:15px;height:15px}
   #hotbar{gap:4px;padding:4px}.slot.bagslot{margin-left:4px}
   body{font-size:9px}
   #toasts{top:96px}
@@ -84,7 +88,7 @@ body.touch #help{display:none}
   <b>WASD / стрелки</b> — ходить<br>
   <b>E / пробел / клик</b> — действие<br>
   <b>1–4 / колесо</b> — инвентарь<br>
-  <b>Q</b> — сменить семена<br>
+  <b>Q</b> — что строить / какие семена<br>
   <b>I / Tab</b> — мешочек<br>
   <b>T</b> (держать) — ускорить время
 </div>
@@ -93,33 +97,51 @@ body.touch #help{display:none}
   <div id="hint" class="panel"></div>
   <div id="hotbar" class="panel"></div>
 </div>
-<div id="touch"><div id="stick"><div id="knob"></div></div><button id="actBtn">E</button></div>
+<div id="touch"><div id="stick"><div id="knob"></div></div><button id="qBtn">Q</button><button id="actBtn">E</button></div>
 <div id="modalWrap" class="hidden"><div id="modal" class="panel"><button id="closeBtn" class="px alt">✕</button><div id="modalBody"></div></div></div>
 <div id="fade"></div>
 
 <script>
 'use strict';
+const $ = id => document.getElementById(id);
 // ================= константы мира =================
 const TS = 16, W = 48, H = 36, CX = 24, CY = 18, RX = 16, RY = 12;
-const DAY = 1440, WET_MAX = 720, CAN_MAX = 10;
+const IW = 11, IH = 9; // комната в домике, в тайлах
+const DAY = 1440, WET_MAX = 720, CAN_MAX = 10, FEED_CAP = 6, COOP_CAP = 4, EGG_CAP = 4;
 const ITEMS = {
   seedWheat: { name: 'Семена пшеницы', buy: 5, note: 'растёт ~2 мин, если полита' },
-  seedCarrot: { name: 'Семена моркови', buy: 10, note: 'растёт ~3 мин, любит воду' },
-  bed: { name: 'Грядка', buy: 25, note: 'ставится молотком на траву' },
+  seedCarrot: { name: 'Семена моркови', buy: 10, note: 'растёт ~3 мин' },
+  seedBeet: { name: 'Семена свёклы', buy: 15, note: 'растёт ~4 мин, дорого продаётся' },
+  seedPotato: { name: 'Семена картофеля', buy: 12, note: 'растёт ~3,5 мин, 2–3 клубня' },
+  bed: { name: 'Грядка', acc: 'грядку', buy: 25, note: 'ставится молотком на траву' },
+  coop: { name: 'Куриный домик', acc: 'куриный домик', buy: 80, note: '1 клетка: до 4 куриц и 4 яиц' },
+  feeder: { name: 'Кормушка', acc: 'кормушку', buy: 30, note: 'насыпай в неё пшеницу' },
+  fence: { name: 'Заборчик', acc: 'заборчик', buy: 4, note: 'низкий, но куры не перелезут' },
+  gate: { name: 'Калитка', acc: 'калитку', buy: 12, note: 'E — открыть, закроется сама' },
+  chicken: { name: 'Курица', buy: 60 },
   wheat: { name: 'Пшеница', sell: 12 },
   carrot: { name: 'Морковь', sell: 28 },
+  beet: { name: 'Свёкла', sell: 45 },
+  potato: { name: 'Картофель', sell: 18 },
+  egg: { name: 'Яйцо', sell: 25 },
 };
 const CROPS = {
-  wheat: { name: 'Пшеница', seed: 'seedWheat', item: 'wheat', grow: 600 },
-  carrot: { name: 'Морковь', seed: 'seedCarrot', item: 'carrot', grow: 900 },
+  wheat: { name: 'Пшеница', seed: 'seedWheat', item: 'wheat', grow: 600, yield: () => Math.random() < 0.3 ? 2 : 1, col: ['#f2cc4c', '#fbe590', '#c9962f'] },
+  carrot: { name: 'Морковь', seed: 'seedCarrot', item: 'carrot', grow: 900, yield: () => 1, col: ['#f08a2b', '#4fae3c', '#ffb15a'] },
+  beet: { name: 'Свёкла', seed: 'seedBeet', item: 'beet', grow: 1200, yield: () => 1, col: ['#8e1f4a', '#3f8f3a', '#c0386a'] },
+  potato: { name: 'Картофель', seed: 'seedPotato', item: 'potato', grow: 1050, yield: () => Math.random() < 0.4 ? 3 : 2, col: ['#c9a063', '#5fb048', '#e6c48a'] },
 };
-const SEED_CROP = { seedWheat: 'wheat', seedCarrot: 'carrot' };
+const SEEDS = ['seedWheat', 'seedCarrot', 'seedBeet', 'seedPotato'];
+const SEED_CROP = { seedWheat: 'wheat', seedCarrot: 'carrot', seedBeet: 'beet', seedPotato: 'potato' };
+const BUILDS = ['bed', 'coop', 'feeder', 'fence', 'gate'];
+const PRODUCE = ['wheat', 'carrot', 'beet', 'potato', 'egg'];
 const TOOLS = [
   { key: 'hammer', name: 'Молоток' },
   { key: 'sledge', name: 'Кувалда' },
   { key: 'can', name: 'Лейка' },
   { key: 'seeds', name: 'Семена' },
 ];
+const plural = (n, one, few, many) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? one : m >= 2 && m <= 4 && (h < 12 || h > 14) ? few : many; };
 
 // ================= шум и форма острова =================
 function hash(x, y) {
@@ -144,7 +166,7 @@ function landV(x, y) {
   return (shoreR(Math.atan2(dy, dx)) - Math.hypot(dx, dy)) * 14;
 }
 
-// ================= раскладка =================
+// ================= раскладка острова =================
 const HOUSE = { x: 15 * TS, y: 11 * TS };
 const DOOR = { tx: 17, ty: 15 };
 const CHEST = { tx: 20, ty: 15 };
@@ -190,11 +212,26 @@ function reserved(tx, ty) {
   return pathDist(tx + 0.5, ty + 0.5) < 1.4;
 }
 
+// ================= раскладка комнаты =================
+const WIN_IN = [20, 120];
+const HOUSE_COLS = [
+  { x: 58, y: 44, w: 60, h: 15 }, // камин
+  { x: 146, y: 50, w: 24, h: 40 }, // кровать
+  { x: 130, y: 50, w: 12, h: 14 }, // тумбочка
+  { x: 24, y: 84, w: 32, h: 14 }, // стол
+  { x: 8, y: 90, w: 12, h: 10 }, // стул
+  { x: 6, y: 52, w: 14, h: 12 }, // фикус
+];
+function houseWalk(px, py) {
+  if (py > 138) return px >= 78 && px <= 98 && py < 148;
+  return px >= 5 && px <= IW * TS - 5 && py >= 50;
+}
+
 // ================= рисование спрайтов =================
 function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
 function pen(c, ox = 0, oy = 0) {
   const g = c.getContext('2d');
-  const P = {
+  return {
     g,
     r(x, y, w, h, col) { g.fillStyle = col; g.fillRect(x + ox, y + oy, w, h); },
     p(x, y, col) { g.fillStyle = col; g.fillRect(x + ox, y + oy, 1, 1); },
@@ -206,7 +243,6 @@ function pen(c, ox = 0, oy = 0) {
       }
     },
   };
-  return P;
 }
 function hexRGB(h) { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
 function outline(c, col) {
@@ -256,7 +292,7 @@ function makePerson(pal, dir, frame) {
       r(4, 6, 8, 1, pal.hair); r(4, 7, 1, 2, pal.hair); r(11, 7, 1, 2, pal.hair);
       r(5, 6, 6, 5, pal.skin); r(5, 6, 6, 1, pal.skinD);
       p(6, 8, EYE); p(9, 8, EYE); p(5, 9, '#e8907a'); p(10, 9, '#e8907a');
-      if (pal.beard) { r(5, 9, 6, 2, pal.beard); r(6, 11, 4, 1, pal.beard); p(5, 9, pal.beard); }
+      if (pal.beard) { r(5, 9, 6, 2, pal.beard); r(6, 11, 4, 1, pal.beard); }
     } else {
       r(4, 6, 8, 4, pal.hair); r(5, 10, 6, 1, pal.skinD);
     }
@@ -296,6 +332,7 @@ function personSet(pal) {
   return s;
 }
 
+// ---- растения (16×24, нижние 16 строк — клетка грядки) ----
 function seedDots(P) {
   for (const [x, y] of [[4, 15], [9, 13], [7, 18], [11, 17], [12, 12]]) { P.p(x, y, '#ecd9a6'); P.p(x, y + 1, '#4a2e1b'); }
 }
@@ -337,6 +374,33 @@ function makeCarrot(stage) {
   }
   return outline(c, '#24521c');
 }
+function makeBeet(stage) {
+  const c = canvas(16, 24), P = pen(c);
+  if (stage === 0) { seedDots(P); return c; }
+  const G = '#3f8f3a', GL = '#5fb048', R = '#b0304a';
+  for (const [x, y] of [[4, 19], [8, 15], [12, 19]]) {
+    if (stage === 1) { P.p(x, y - 1, R); P.p(x - 1, y - 2, GL); P.p(x + 1, y - 2, G); continue; }
+    const s = stage === 2 ? 1 : 2;
+    const leaf = (lx, ly) => { P.r(lx - 1, ly, 3, s + 1, G); P.p(lx, ly - 1, GL); P.p(lx, ly, R); };
+    P.p(x, y - 1, R); P.p(x, y - 2, R); P.p(x - 1, y - 3, R); P.p(x + 1, y - 3, R);
+    leaf(x - 2, y - 4 - s); leaf(x + 2, y - 4 - s);
+    if (stage >= 3) leaf(x, y - 6 - s);
+    if (stage === 4) { P.r(x - 1, y - 1, 3, 2, '#8e1f4a'); P.p(x - 1, y - 1, '#c0386a'); }
+  }
+  return outline(c, '#24401c');
+}
+function makePotato(stage) {
+  const c = canvas(16, 24), P = pen(c);
+  if (stage === 0) { seedDots(P); return c; }
+  for (const [x, y] of [[5, 19], [11, 16]]) {
+    if (stage === 1) { P.p(x, y - 1, '#4fae3c'); P.p(x - 1, y - 2, '#7fd05a'); P.p(x + 1, y - 2, '#7fd05a'); continue; }
+    if (stage === 2) { P.circ(x + 0.5, y - 3, 2.6, '#3f8f3a'); P.p(x, y - 4, '#5fb048'); P.p(x + 1, y - 3, '#5fb048'); continue; }
+    if (stage === 4) { P.r(x - 3, y - 1, 2, 2, '#c9a063'); P.r(x + 2, y - 1, 2, 2, '#c9a063'); P.p(x - 3, y - 1, '#e6c48a'); }
+    P.circ(x + 0.5, y - 4, 3.6, '#3f8f3a'); P.circ(x, y - 5, 2.2, '#5fb048'); P.p(x - 1, y - 6, '#84cc5a');
+    if (stage === 4) { P.p(x - 2, y - 6, '#ffffff'); P.p(x + 2, y - 4, '#ffffff'); P.p(x, y - 8, '#f4e0ff'); P.p(x + 1, y - 7, '#f7d24a'); }
+  }
+  return outline(c, '#24401c');
+}
 function makeBed(wet) {
   const c = canvas(16, 16), P = pen(c);
   const S = wet ? ['#5c3b25', '#4a2e1b', '#73503a'] : ['#a06d44', '#87582f', '#b98a5e'];
@@ -351,6 +415,8 @@ function makeBed(wet) {
   if (wet) { P.p(4, 6, '#8a6e66'); P.p(10, 9, '#8a6e66'); P.p(12, 3, '#8a6e66'); }
   return c;
 }
+
+// ---- декор острова ----
 function makeTree(apples) {
   const c = canvas(34, 46), P = pen(c);
   P.r(14, 30, 6, 14, '#7a4f2c'); P.r(14, 30, 2, 14, '#946238'); P.r(18, 30, 2, 14, '#5e3b1e');
@@ -379,7 +445,6 @@ function makeRock(big) {
   const c = canvas(16, 12), P = pen(c);
   const rx = big ? 6 : 4.5;
   P.circ(8, 7, rx, '#6c7078'); P.circ(7.5, 6, rx - 1, '#8d939b'); P.circ(6.5, 5, rx - 2.5, '#b4b9bf'); P.p(6, 4, '#dfe2e5');
-  P.r(1, 9, 14, 3, 'rgba(0,0,0,0)');
   return outline(c, '#3d3f45');
 }
 function makeHouse() {
@@ -433,7 +498,7 @@ function makeLamp(lit) {
   const c = canvas(9, 27), P = pen(c, 1, 1), r = P.r;
   r(2, 7, 3, 16, '#4a3528'); r(2, 7, 1, 16, '#6e5240'); r(1, 22, 5, 2, '#3a2a20');
   r(0, 1, 7, 7, '#3a3a40'); r(1, 2, 5, 5, lit ? '#ffd66b' : '#cfe3e8'); if (lit) r(2, 3, 2, 2, '#fff4c2'); else P.p(2, 3, '#ffffff');
-  r(1, 0, 5, 1, '#2e2e34'); r(3, -1, 1, 1, '#2e2e34');
+  r(1, 0, 5, 1, '#2e2e34');
   return outline(c, '#1e1a22');
 }
 function makeCrate() {
@@ -455,8 +520,160 @@ function makeBoat() {
   return outline(c, '#3a2418');
 }
 
-// иконки 16×16
+// ---- курятник ----
+function makeChicken(col, frame) { // смотрит вправо; frame 0 стоит, 1 шаг, 2 клюёт
+  const c = canvas(14, 13), P = pen(c, 1, 1), r = P.r, p = P.p;
+  const [B, S, Wg] = col;
+  r(1, 2, 2, 3, B); p(0, 2, B);
+  r(2, 4, 7, 5, B); r(3, 3, 5, 1, B); r(3, 9, 5, 1, S); r(2, 8, 7, 1, S);
+  r(4, 5, 3, 2, Wg); p(4, 7, S);
+  if (frame === 2) { r(8, 4, 3, 3, B); r(8, 3, 2, 1, '#e0453a'); p(11, 6, '#f2b33a'); p(10, 5, '#2b1d2e'); p(9, 7, '#e0453a'); }
+  else { r(8, 1, 3, 4, B); r(8, 0, 2, 1, '#e0453a'); p(10, 0, '#e0453a'); p(11, 3, '#f2b33a'); p(10, 2, '#2b1d2e'); p(10, 4, '#e0453a'); }
+  const L = '#e8963a';
+  if (frame === 1) { p(3, 10, L); p(4, 10, L); p(7, 10, L); } else { p(5, 10, L); p(7, 10, L); }
+  return outline(c, '#3a2a22');
+}
+const CHICK_COLS = [['#f8f4ea', '#d9d2c2', '#e6dfcf'], ['#c9884a', '#a5692f', '#b5743b']];
+function makeCoop() {
+  const c = canvas(20, 28), P = pen(c, 1, 1), r = P.r;
+  for (let i = 0; i < 9; i++) r(8 - i, i, 2 + 2 * i, 1, i % 3 === 2 ? '#9e3a2c' : '#c44d3a');
+  r(8, 0, 2, 1, '#e06a4f'); r(0, 9, 18, 1, '#7d2e22');
+  r(1, 10, 16, 14, '#b07a45'); r(1, 10, 16, 1, '#8a5a30');
+  for (const x of [4, 8, 13]) r(x, 11, 1, 13, '#8a5a30');
+  r(6, 15, 6, 9, '#3a2418'); P.p(6, 15, '#b07a45'); P.p(11, 15, '#b07a45');
+  r(6, 22, 6, 2, '#e8c25a'); P.p(7, 21, '#e8c25a');
+  r(1, 24, 16, 2, '#6e4527'); r(6, 24, 6, 2, '#cf9a5e');
+  return outline(c, '#3a2418');
+}
+function makeFeeder(level) {
+  const c = canvas(18, 14), P = pen(c, 1, 1), r = P.r;
+  r(2, 9, 2, 3, '#6e4527'); r(12, 9, 2, 3, '#6e4527');
+  r(0, 3, 16, 7, '#8a5a30'); r(0, 3, 16, 1, '#b07a45'); r(0, 9, 16, 1, '#6e4527');
+  r(2, 4, 12, 3, '#4a2e1b');
+  if (level === 1) { r(2, 5, 12, 2, '#d9b04a'); P.p(4, 5, '#f2cc4c'); P.p(9, 5, '#f2cc4c'); }
+  if (level === 2) { r(2, 3, 12, 4, '#f2cc4c'); r(4, 2, 8, 1, '#f2cc4c'); P.p(5, 2, '#fbe590'); P.p(9, 3, '#fbe590'); P.p(12, 4, '#c9962f'); P.p(3, 5, '#c9962f'); }
+  return outline(c, '#3a2418');
+}
+// маска соседей: 1 слева, 2 справа, 4 сверху, 8 снизу
+function makeFence(mask) {
+  const c = canvas(18, 18), P = pen(c, 1, 1), r = P.r, RL = '#c99a62', RD = '#8a5a30';
+  if (mask & 4) { r(7, 0, 2, 7, RL); r(8, 0, 1, 7, RD); }
+  if (mask & 8) { r(7, 13, 2, 3, RL); r(8, 13, 1, 3, RD); }
+  if (mask & 1) { r(0, 7, 7, 2, RL); r(0, 11, 7, 2, RL); r(0, 8, 7, 1, RD); r(0, 12, 7, 1, RD); }
+  if (mask & 2) { r(9, 7, 7, 2, RL); r(9, 11, 7, 2, RL); r(9, 8, 7, 1, RD); r(9, 12, 7, 1, RD); }
+  r(6, 5, 4, 9, '#b98a5a'); r(6, 5, 4, 1, '#e0b07a'); r(9, 6, 1, 8, RD);
+  return outline(c, '#4a2f1d');
+}
+function makeGate(horiz, open) {
+  const c = canvas(18, 18), P = pen(c, 1, 1), r = P.r, W1 = '#a8713f', WD = '#6e4527';
+  if (horiz) {
+    r(0, 4, 3, 10, '#b98a5a'); r(13, 4, 3, 10, '#b98a5a'); r(0, 4, 3, 1, '#e0b07a'); r(13, 4, 3, 1, '#e0b07a');
+    if (open) { r(3, 1, 2, 11, W1); r(4, 1, 1, 11, WD); }
+    else {
+      r(3, 6, 10, 7, W1); r(3, 6, 10, 1, '#c99a62'); r(6, 7, 1, 6, '#8a5a30'); r(9, 7, 1, 6, '#8a5a30');
+      for (let i = 0; i < 6; i++) P.p(4 + i + Math.floor(i / 2), 12 - i, WD);
+    }
+  } else {
+    r(6, 0, 4, 4, '#b98a5a'); r(6, 12, 4, 4, '#b98a5a'); r(6, 0, 4, 1, '#e0b07a'); r(6, 12, 4, 1, '#e0b07a');
+    if (open) { r(10, 2, 6, 2, W1); r(10, 3, 6, 1, WD); }
+    else { r(6, 4, 4, 8, W1); r(6, 6, 4, 1, '#8a5a30'); r(6, 9, 4, 1, '#8a5a30'); r(7, 4, 1, 8, '#c99a62'); }
+  }
+  return outline(c, '#4a2f1d');
+}
+
+// ---- мебель в домике ----
+function makeBigBed() {
+  const c = canvas(26, 42), P = pen(c, 1, 1), r = P.r;
+  r(0, 0, 24, 7, '#6e4527'); r(0, 0, 24, 1, '#8a5a30'); r(0, 0, 2, 9, '#5e3b1e'); r(22, 0, 2, 9, '#5e3b1e');
+  r(2, 6, 20, 30, '#f4ead0');
+  r(4, 7, 16, 6, '#ffffff'); r(4, 12, 16, 1, '#d9cfb8'); r(5, 8, 3, 1, '#f4ead0');
+  const Q = ['#3d6fb0', '#e3c9a0', '#c84b3a', '#4fa3a5'];
+  for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) r(1 + x * 5.5 | 0, 15 + y * 5, 6, 5, Q[(x + y) % 4]);
+  r(1, 14, 22, 2, '#f4ead0'); r(1, 15, 22, 1, '#d9cfb8');
+  r(1, 34, 22, 1, '#2c4f86');
+  r(0, 35, 24, 5, '#6e4527'); r(0, 35, 24, 1, '#8a5a30'); r(0, 35, 2, 5, '#5e3b1e'); r(22, 35, 2, 5, '#5e3b1e');
+  return outline(c, '#2e1c14');
+}
+function makeTable() {
+  const c = canvas(34, 22), P = pen(c, 1, 1), r = P.r;
+  r(1, 16, 3, 4, '#5e3b1e'); r(28, 16, 3, 4, '#5e3b1e');
+  r(0, 0, 32, 14, '#a8713f'); r(0, 0, 32, 1, '#cf9a5e');
+  for (const y of [4, 9]) r(0, y, 32, 1, '#8a5a30');
+  r(0, 14, 32, 3, '#7a4f2c');
+  r(5, 3, 5, 5, '#e3c9a0'); r(5, 3, 5, 1, '#f4ead0'); r(6, 4, 3, 1, '#6e4527'); r(10, 4, 1, 3, '#e3c9a0');
+  r(17, 3, 11, 7, '#e8e2d4'); r(18, 4, 9, 4, '#d9a05a'); r(19, 4, 7, 1, '#f0c27a'); P.p(21, 6, '#b5793a'); P.p(24, 6, '#b5793a');
+  return outline(c, '#2e1c14');
+}
+function makeChair() {
+  const c = canvas(14, 22), P = pen(c, 1, 1), r = P.r;
+  r(1, 13, 2, 7, '#5e3b1e'); r(10, 13, 2, 7, '#5e3b1e');
+  r(1, 10, 11, 3, '#a8713f'); r(1, 10, 11, 1, '#cf9a5e');
+  r(1, 0, 3, 13, '#8a5a30'); r(1, 0, 3, 1, '#b07a45'); r(2, 3, 1, 5, '#6e4527');
+  return outline(c, '#2e1c14');
+}
+function makeNightstand() {
+  const c = canvas(14, 18), P = pen(c, 1, 1), r = P.r;
+  r(0, 5, 12, 11, '#8a5a30'); r(0, 5, 12, 2, '#b07a45'); r(2, 9, 8, 3, '#6e4527'); P.p(6, 10, '#f0c94a');
+  r(5, 2, 2, 4, '#f4ead0'); r(4, 5, 4, 1, '#c1c6cb'); P.p(5, 0, '#ffd66b'); P.p(5, 1, '#ff9a3a'); P.p(6, 1, '#ffd66b');
+  return outline(c, '#2e1c14');
+}
+function makePlant() {
+  const c = canvas(16, 22), P = pen(c, 1, 1), r = P.r;
+  r(3, 13, 8, 6, '#c4653a'); r(2, 12, 10, 2, '#d9774a'); r(9, 13, 2, 6, '#a5502c');
+  P.circ(7, 7, 5.5, '#2f6f2e'); P.circ(5, 5, 3, '#3f8f3a'); P.circ(9.5, 4.5, 2.6, '#3f8f3a'); P.circ(7, 9, 2.5, '#5fb048'); P.p(5, 4, '#84cc5a'); P.p(10, 3, '#84cc5a');
+  return outline(c, '#1d3b22');
+}
+function makeInterior() {
+  const w = IW * TS, h = IH * TS, c = canvas(w, h), P = pen(c);
+  P.r(0, 0, w, h, '#2a1a14');
+  for (let y = 48, k = 0; y < 140; y += 6, k++) {
+    P.r(4, y, w - 8, 5, k % 2 ? '#b98552' : '#c39060');
+    P.r(4, y + 5, w - 8, 1, '#7a4f2c');
+    for (let x = 4 + (k * 23) % 37; x < w - 4; x += 37) P.r(x, y, 1, 5, '#8a5a30');
+    for (let i = 0; i < 10; i++) P.p(4 + Math.floor(hash(i, k) * (w - 8)), y + 1 + Math.floor(hash(k, i) * 4), '#d4a271');
+  }
+  P.g.fillStyle = 'rgba(40,20,10,.35)'; P.g.fillRect(4, 48, w - 8, 3);
+  P.r(4, 4, w - 8, 28, '#e9d7b4');
+  for (let x = 4; x < w - 4; x += 8) { P.r(x + 3, 4, 2, 28, '#dfc89e'); P.p(x + 1, 10, '#c9a77a'); P.p(x + 1, 22, '#c9a77a'); }
+  P.r(4, 32, w - 8, 12, '#a8713f'); for (let x = 4; x < w - 4; x += 12) P.r(x, 32, 1, 12, '#8a5a30'); P.r(4, 32, w - 8, 1, '#cf9a5e');
+  P.r(4, 44, w - 8, 4, '#6e4527');
+  P.r(0, 0, w, 4, '#3a2418'); P.r(0, 0, 4, h, '#3a2418'); P.r(w - 4, 0, 4, h, '#3a2418'); P.r(0, h - 4, w, 4, '#3a2418');
+  P.r(80, h - 4, 16, 4, '#7a4f2c'); P.r(80, h - 4, 16, 1, '#a8713f');
+  for (const wx of WIN_IN) {
+    P.r(wx - 2, 8, 28, 22, '#6e4527'); P.r(wx - 3, 29, 30, 3, '#8a5a30'); P.r(wx - 3, 29, 30, 1, '#b07a45');
+    P.r(wx - 5, 6, 5, 23, '#c84b3a'); P.r(wx + 24, 6, 5, 23, '#c84b3a'); P.r(wx - 4, 6, 1, 23, '#9e3a2c'); P.r(wx + 26, 6, 1, 23, '#9e3a2c');
+    P.r(wx - 6, 5, 36, 2, '#6e4527');
+  }
+  P.r(150, 20, 20, 2, '#6e4527');
+  const BK = ['#3d6fb0', '#c84b3a', '#4fa3a5', '#f2cc4c', '#6a4392', '#5fb048'];
+  for (let i = 0; i < 6; i++) P.r(151 + i * 3, 12 + (i % 2), 2, 8 - (i % 2), BK[i]);
+  // камин
+  P.r(70, 4, 36, 14, '#7b8189');
+  for (let y = 6, k = 0; y < 16; y += 5, k++) { P.r(70, y, 36, 1, '#666b72'); for (let x = 70 + (k % 2) * 5; x < 106; x += 10) P.r(x, y, 1, 5, '#666b72'); }
+  P.r(62, 21, 52, 33, '#8d939b');
+  for (let y = 21, k = 0; y < 54; y += 5, k++) { P.r(62, y, 52, 1, '#6c7078'); for (let x = 62 + (k % 2) * 5; x < 114; x += 10) P.r(x, y, 1, 5, '#6c7078'); }
+  P.r(60, 16, 56, 5, '#7a4f2c'); P.r(60, 16, 56, 1, '#a8713f');
+  P.r(74, 27, 28, 24, '#1a1210'); P.r(76, 25, 24, 2, '#1a1210');
+  P.r(58, 52, 60, 7, '#a7adb4'); P.r(58, 52, 60, 1, '#c9ced3'); P.r(58, 58, 60, 1, '#6c7078');
+  P.r(66, 12, 4, 4, '#c4653a'); P.r(104, 11, 6, 5, '#e8e2d4'); P.p(106, 10, '#f2cc4c');
+  // ковёр и коврик у двери
+  P.r(62, 96, 52, 28, '#a33b3b'); P.r(64, 98, 48, 24, '#c9573f'); P.r(66, 100, 44, 20, '#a33b3b');
+  for (let i = 0; i < 6; i++) { P.r(88 - i, 105 + i, 2 * i + 1, 1, '#f0c94a'); P.r(88 - i, 116 - i, 2 * i + 1, 1, '#f0c94a'); }
+  for (let y = 97; y < 124; y += 2) { P.p(61, y, '#e8d6b0'); P.p(114, y, '#e8d6b0'); }
+  P.r(76, 128, 24, 10, '#8a6a3a'); for (let x = 78; x < 98; x += 3) P.r(x, 129, 1, 8, '#a8844a');
+  return c;
+}
+
+// ---- иконки 16×16 ----
 function icon(fn, ol = '#3a2418') { const c = canvas(16, 16), P = pen(c); fn(P); return outline(c, ol); }
+function pouch(P, kind) {
+  P.r(4, 6, 8, 8, '#d9b77a'); P.r(5, 5, 6, 1, '#d9b77a'); P.r(4, 13, 8, 1, '#b8955a'); P.r(11, 6, 1, 7, '#b8955a');
+  P.r(5, 4, 6, 1, '#8a5a30'); P.r(4, 2, 3, 2, '#d9b77a'); P.r(9, 2, 3, 2, '#d9b77a'); P.r(6, 3, 4, 1, '#c4a266');
+  if (kind === 'wheat') { P.r(7, 8, 2, 4, '#f2cc4c'); P.p(7, 8, '#fbe590'); P.p(8, 11, '#c9962f'); P.p(7, 12, '#c9962f'); }
+  if (kind === 'carrot') { P.r(7, 9, 2, 3, '#f08a2b'); P.p(7, 12, '#c4651a'); P.p(7, 8, '#4fae3c'); P.p(8, 7, '#4fae3c'); }
+  if (kind === 'beet') { P.r(6, 9, 4, 3, '#8e1f4a'); P.p(6, 9, '#c0386a'); P.p(7, 12, '#8e1f4a'); P.p(7, 8, '#3f8f3a'); P.p(8, 7, '#3f8f3a'); }
+  if (kind === 'potato') { P.r(6, 9, 4, 3, '#c9a063'); P.p(6, 9, '#e6c48a'); P.p(8, 10, '#9a7444'); }
+}
 const ICON = {
   hammer: icon(P => { P.r(7, 6, 2, 9, '#8a5a30'); P.r(7, 6, 1, 9, '#b07a45'); P.r(3, 2, 10, 4, '#8d939b'); P.r(3, 2, 10, 1, '#c3c8ce'); P.r(3, 5, 10, 1, '#62676e'); P.r(2, 3, 1, 2, '#62676e'); }),
   sledge: icon(P => { P.r(7, 7, 2, 8, '#8a5a30'); P.r(7, 7, 1, 8, '#b07a45'); P.r(2, 1, 12, 6, '#5c6169'); P.r(2, 1, 12, 1, '#8d939b'); P.r(4, 1, 1, 6, '#45494f'); P.r(11, 1, 1, 6, '#45494f'); P.r(2, 6, 12, 1, '#3e4147'); }),
@@ -468,6 +685,8 @@ const ICON = {
   }),
   seedWheat: icon(P => pouch(P, 'wheat')),
   seedCarrot: icon(P => pouch(P, 'carrot')),
+  seedBeet: icon(P => pouch(P, 'beet')),
+  seedPotato: icon(P => pouch(P, 'potato')),
   wheat: icon(P => {
     P.r(5, 7, 1, 7, '#c9962f'); P.r(8, 6, 1, 8, '#c9962f'); P.r(11, 7, 1, 7, '#c9962f');
     P.r(4, 3, 2, 4, '#f2cc4c'); P.r(7, 2, 2, 4, '#f2cc4c'); P.r(10, 3, 2, 4, '#f2cc4c');
@@ -480,11 +699,27 @@ const ICON = {
     P.r(7, 6, 1, 3, '#ffb15a');
     P.r(8, 2, 1, 4, '#4fae3c'); P.r(9, 3, 1, 3, '#3a8a2c'); P.p(6, 3, '#7fd05a'); P.p(7, 4, '#4fae3c'); P.p(10, 2, '#4fae3c'); P.p(7, 5, '#4fae3c');
   }),
+  beet: icon(P => {
+    P.circ(8, 10, 4.2, '#8e1f4a'); P.r(6, 8, 2, 2, '#c0386a'); P.p(8, 14, '#8e1f4a'); P.p(8, 15, '#6e1638'); P.r(10, 9, 1, 4, '#6e1638');
+    P.r(7, 3, 1, 4, '#b0304a'); P.r(9, 3, 1, 4, '#b0304a'); P.r(5, 1, 3, 3, '#3f8f3a'); P.r(9, 1, 3, 3, '#3f8f3a'); P.p(6, 1, '#5fb048'); P.p(10, 1, '#5fb048');
+  }),
+  potato: icon(P => {
+    P.circ(7, 9, 4.2, '#c9a063'); P.circ(10, 10, 3.6, '#c9a063'); P.r(4, 7, 3, 2, '#e6c48a');
+    P.p(6, 10, '#9a7444'); P.p(9, 8, '#9a7444'); P.p(11, 11, '#9a7444'); P.r(7, 12, 5, 1, '#a88550');
+  }),
+  egg: icon(P => { P.circ(8, 9.5, 4.6, '#fbf3e0'); P.circ(8, 7, 3.6, '#fbf3e0'); P.r(10, 9, 2, 4, '#e6d8bb'); P.r(7, 13, 3, 1, '#e6d8bb'); P.p(6, 6, '#ffffff'); P.p(6, 7, '#ffffff'); }, '#8a7a60'),
   bed: icon(P => {
     P.r(1, 5, 14, 9, '#b07a45'); P.r(1, 5, 14, 1, '#cf9a5e'); P.r(1, 12, 14, 2, '#8a5a30');
     P.r(3, 6, 10, 5, '#a06d44'); P.r(3, 8, 10, 1, '#87582f');
     P.r(8, 3, 1, 4, '#4fae3c'); P.p(7, 3, '#7fd05a'); P.p(9, 2, '#4fae3c');
   }),
+  coop: icon(P => {
+    for (let i = 0; i < 5; i++) P.r(7 - i, 1 + i, 2 + 2 * i, 1, '#c44d3a');
+    P.r(2, 6, 12, 1, '#7d2e22'); P.r(3, 7, 10, 7, '#b07a45'); P.r(6, 9, 4, 5, '#3a2418'); P.r(6, 12, 4, 2, '#e8c25a'); P.r(3, 13, 10, 1, '#6e4527');
+  }),
+  feeder: icon(P => { P.r(3, 12, 2, 3, '#6e4527'); P.r(11, 12, 2, 3, '#6e4527'); P.r(1, 7, 14, 6, '#8a5a30'); P.r(1, 7, 14, 1, '#b07a45'); P.r(3, 6, 10, 3, '#f2cc4c'); P.r(5, 5, 6, 1, '#f2cc4c'); P.p(6, 6, '#fbe590'); }),
+  fence: icon(P => { P.r(1, 6, 14, 2, '#c99a62'); P.r(1, 10, 14, 2, '#c99a62'); P.r(3, 3, 3, 11, '#b98a5a'); P.r(10, 3, 3, 11, '#b98a5a'); P.r(3, 3, 3, 1, '#e0b07a'); P.r(10, 3, 3, 1, '#e0b07a'); }),
+  gate: icon(P => { P.r(1, 3, 2, 11, '#b98a5a'); P.r(13, 3, 2, 11, '#b98a5a'); P.r(3, 5, 10, 8, '#a8713f'); P.r(3, 5, 10, 1, '#c99a62'); P.r(6, 6, 1, 7, '#8a5a30'); P.r(9, 6, 1, 7, '#8a5a30'); for (let i = 0; i < 7; i++) P.p(4 + i, 12 - i, '#6e4527'); }),
   coin: icon(P => { P.circ(8, 8, 6, '#f2c94c'); P.circ(8, 8, 4.2, '#d9a630'); P.circ(8, 8, 3.2, '#f2c94c'); P.r(7, 6, 2, 4, '#d9a630'); P.r(5, 4, 2, 1, '#fff2b0'); P.p(4, 5, '#fff2b0'); }, '#7a4f12'),
   bag: icon(P => {
     P.circ(8, 10, 5.2, '#a8713f'); P.r(5, 4, 6, 3, '#a8713f'); P.r(4, 2, 3, 2, '#a8713f'); P.r(9, 2, 3, 2, '#a8713f');
@@ -494,20 +729,14 @@ const ICON = {
   moon: icon(P => { P.circ(8, 8, 5.5, '#f4e9b0'); P.g.globalCompositeOperation = 'destination-out'; P.circ(10.5, 6, 4.5, '#000'); P.g.globalCompositeOperation = 'source-over'; P.p(5, 9, '#d8cc8e'); }, '#5a5070'),
   rain: icon(P => { P.circ(6, 7, 3.5, '#c9d2dc'); P.circ(10, 6, 4, '#c9d2dc'); P.r(3, 7, 11, 3, '#c9d2dc'); P.r(4, 7, 3, 1, '#ffffff'); P.p(4, 12, '#5ec7e6'); P.p(8, 13, '#5ec7e6'); P.p(12, 12, '#5ec7e6'); P.p(6, 14, '#5ec7e6'); P.p(10, 14, '#5ec7e6'); }, '#4a5868'),
 };
-function pouch(P, kind) {
-  P.r(4, 6, 8, 8, '#d9b77a'); P.r(5, 5, 6, 1, '#d9b77a'); P.r(4, 13, 8, 1, '#b8955a'); P.r(11, 6, 1, 7, '#b8955a');
-  P.r(5, 4, 6, 1, '#8a5a30'); P.r(4, 2, 3, 2, '#d9b77a'); P.r(9, 2, 3, 2, '#d9b77a'); P.r(6, 3, 4, 1, '#c4a266');
-  if (kind === 'wheat') { P.r(7, 8, 2, 4, '#f2cc4c'); P.p(7, 8, '#fbe590'); P.p(8, 11, '#c9962f'); P.p(7, 12, '#c9962f'); }
-  else { P.r(7, 9, 2, 3, '#f08a2b'); P.p(7, 12, '#c4651a'); P.p(7, 8, '#4fae3c'); P.p(8, 7, '#4fae3c'); }
-}
-const ICON_URL = {};
-for (const k in ICON) ICON_URL[k] = ICON[k].toDataURL();
 
 const SPR = {
   farmer: personSet(PAL_FARMER),
   trader: personSet(PAL_TRADER),
   wheat: [0, 1, 2, 3].map(s => makeWheat(s, 0)).concat([makeWheat(4, 0), makeWheat(4, 1)]),
-  carrot: [0, 1, 2, 3, 4].map(s => makeCarrot(s)),
+  carrot: [0, 1, 2, 3, 4].map(makeCarrot),
+  beet: [0, 1, 2, 3, 4].map(makeBeet),
+  potato: [0, 1, 2, 3, 4].map(makePotato),
   bedDry: makeBed(false), bedWet: makeBed(true),
   tree: makeTree(false), appleTree: makeTree(true),
   bush: makeBush(null), berryBush: makeBush('#e04a6a'),
@@ -515,9 +744,20 @@ const SPR = {
   house: makeHouse(), chest: makeChest(), well: makeWell(),
   lamp: makeLamp(false), lampLit: makeLamp(true),
   crate: makeCrate(), boat: makeBoat(),
+  chickenR: CHICK_COLS.map(col => [0, 1, 2].map(f => makeChicken(col, f))),
+  coop: makeCoop(),
+  feeder: [0, 1, 2].map(makeFeeder),
+  fence: Array.from({ length: 16 }, (_, m) => makeFence(m)),
+  gate: { hC: makeGate(true, false), hO: makeGate(true, true), vC: makeGate(false, false), vO: makeGate(false, true) },
+  bigBed: makeBigBed(), table: makeTable(), chair: makeChair(), nightstand: makeNightstand(), plant: makePlant(),
 };
+SPR.chickenL = SPR.chickenR.map(set => set.map(mirror));
+const INTERIOR = makeInterior();
+ICON.chicken = (() => { const c = canvas(16, 16); c.getContext('2d').drawImage(SPR.chickenR[0][0], 1, 2); return c; })();
+const ICON_URL = {};
+for (const k in ICON) ICON_URL[k] = ICON[k].toDataURL();
 
-// ================= декор =================
+// ================= декор острова =================
 const props = []; // {x,y(основание),spr,ox,oy,shadow}
 const trees = [];
 for (const [tx, ty, apple] of [[9, 14, 0], [11, 22, 1], [35, 13, 0], [34, 23, 1], [20, 26, 0], [38, 18, 0], [14, 26, 0], [31, 9, 1], [24, 8, 0], [8, 19, 0], [40, 15, 1], [37, 24, 0]]) {
@@ -557,6 +797,13 @@ const LIGHTS = [
   ...WINDOWS.map(w => ({ x: w.x + 6, y: w.y + 8, r: 44 })),
   { x: LAMP.x, y: LAMP.y - 20, r: 52 },
   { x: PIER_LAMP.x, y: PIER_LAMP.y - 20, r: 56 },
+];
+const HOUSE_PROPS = [
+  { spr: SPR.bigBed, x: 145, y: 49, sy: 90 },
+  { spr: SPR.nightstand, x: 129, y: 47, sy: 64 },
+  { spr: SPR.table, x: 23, y: 77, sy: 97 },
+  { spr: SPR.chair, x: 7, y: 79, sy: 99 },
+  { spr: SPR.plant, x: 5, y: 45, sy: 64 },
 ];
 
 // ================= земля =================
@@ -601,7 +848,6 @@ function buildGround() {
   g.putImageData(img, 0, 0);
   fa.getContext('2d').putImageData(ia, 0, 0); fb.getContext('2d').putImageData(ib, 0, 0);
 
-  // цветы и травинки
   const rnd = mulberry32(9);
   const FL = ['#ffffff', '#f7a6c4', '#f7d24a', '#a8c8ff', '#ff8a6a'];
   for (let i = 0; i < 1400; i++) {
@@ -610,8 +856,8 @@ function buildGround() {
     if (landV(x, y) < 2 || pathDist(x, y) < 0.9) continue;
     if (i % 6 === 0) {
       if (reserved(Math.floor(x), Math.floor(y))) continue;
-      const fc = FL[Math.floor(rnd() * FL.length)];
-      g.fillStyle = fc; g.fillRect(px - 1, py, 1, 1); g.fillRect(px + 1, py, 1, 1); g.fillRect(px, py - 1, 1, 1); g.fillRect(px, py + 1, 1, 1);
+      g.fillStyle = FL[Math.floor(rnd() * FL.length)];
+      g.fillRect(px - 1, py, 1, 1); g.fillRect(px + 1, py, 1, 1); g.fillRect(px, py - 1, 1, 1); g.fillRect(px, py + 1, 1, 1);
       g.fillStyle = '#f2cc4c'; g.fillRect(px, py, 1, 1);
     } else {
       g.fillStyle = rnd() < 0.5 ? '#4f9238' : '#8fd062';
@@ -639,8 +885,8 @@ const SAVE_KEY = 'ostrov-ferma-v1';
 function newState() {
   return {
     v: 1, t: 6 * 60, paidIdx: 0, coins: 20,
-    bag: { seedWheat: 4, seedCarrot: 2, bed: 2, wheat: 0, carrot: 0 },
-    chest: { wheat: 0, carrot: 0 },
+    bag: { seedWheat: 4, seedCarrot: 2, seedBeet: 0, seedPotato: 0, wheat: 0, carrot: 0, beet: 0, potato: 0, egg: 0, bed: 2, coop: 0, feeder: 0, fence: 0, gate: 0 },
+    chest: { wheat: 0, carrot: 0, beet: 0, potato: 0, egg: 0 },
     beds: [
       { tx: 22, ty: 13, crop: 'wheat', prog: 600, wet: 0 },
       { tx: 23, ty: 13, crop: 'wheat', prog: 600, wet: 0 },
@@ -649,13 +895,22 @@ function newState() {
       { tx: 23, ty: 14, crop: 'carrot', prog: 200, wet: 0 },
       { tx: 24, ty: 14, crop: null, prog: 0, wet: 0 },
     ],
-    water: CAN_MAX, sel: 0, seedType: 'seedWheat',
+    objs: [], chickens: [],
+    water: CAN_MAX, sel: 0, seedType: 'seedWheat', buildType: 'bed',
     rain: { on: false, left: 0 }, firstRain: false,
-    px: 17.5 * TS, py: 17.5 * TS, dir: 0,
+    scene: 'island', px: 17.5 * TS, py: 17.5 * TS, dir: 0,
   };
 }
+function migrate(s) {
+  const d = newState();
+  for (const k in d.bag) s.bag[k] = s.bag[k] || 0;
+  for (const k in d.chest) s.chest[k] = s.chest[k] || 0;
+  s.objs = s.objs || []; s.chickens = s.chickens || [];
+  s.buildType = s.buildType || 'bed'; s.scene = s.scene || 'island';
+  return s;
+}
 function loadState() {
-  try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && s.v === 1) return s; } catch (e) { }
+  try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && s.v === 1) return migrate(s); } catch (e) { }
   return null;
 }
 const freshGame = !loadState();
@@ -664,14 +919,51 @@ function save() {
   state.px = player.x; state.py = player.y; state.dir = player.dir;
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { }
 }
-const player = { x: state.px, y: state.py, dir: state.dir, walkT: 0, moving: false, actT: 0, actIcon: null };
+const player = { x: state.px, y: state.py, dir: state.dir, walkT: 0, moving: false, actT: 0, actIcon: null, sit: false };
 let rainI = state.rain.on ? 1 : 0;
 
 const hourOf = () => (state.t / 60) % 24;
 const dayNum = () => Math.floor((state.t - 360) / DAY) + 1;
+const isNight = () => { const h = hourOf(); return h >= 20 || h < 6; };
 const bedAt = (tx, ty) => state.beds.find(b => b.tx === tx && b.ty === ty);
+const objAt = (tx, ty) => state.objs.find(o => o.tx === tx && o.ty === ty);
 function stageOf(b) { const g = CROPS[b.crop].grow; return b.prog >= g ? 4 : Math.min(3, Math.floor(b.prog / g * 4)); }
 const ripe = b => b.crop && b.prog >= CROPS[b.crop].grow;
+const chickensIn = coop => state.chickens.filter(c => c.ctx === coop.tx && c.cty === coop.ty).length;
+const coopOf = ch => state.objs.find(o => o.type === 'coop' && o.tx === ch.ctx && o.ty === ch.cty);
+function coopWithSpace() {
+  let best = null, bn = 99;
+  for (const o of state.objs) if (o.type === 'coop') { const n = chickensIn(o); if (n < COOP_CAP && n < bn) { best = o; bn = n; } }
+  return best;
+}
+const freeCoopPlaces = () => state.objs.reduce((s, o) => s + (o.type === 'coop' ? COOP_CAP - chickensIn(o) : 0), 0);
+
+// подвижные препятствия: постройки, забор, калитки
+let dynCols = [];
+const objInfo = new Map();
+function rebuildDyn() {
+  dynCols = []; objInfo.clear();
+  const isF = (x, y) => { const o = objAt(x, y); return !!o && (o.type === 'fence' || o.type === 'gate'); };
+  for (const o of state.objs) {
+    const x = o.tx * TS, y = o.ty * TS;
+    if (o.type === 'coop') dynCols.push({ x: x + 1, y: y + 4, w: 14, h: 11 });
+    else if (o.type === 'feeder') dynCols.push({ x: x + 1, y: y + 7, w: 14, h: 8 });
+    else if (o.type === 'fence') {
+      const m = (isF(o.tx - 1, o.ty) ? 1 : 0) | (isF(o.tx + 1, o.ty) ? 2 : 0) | (isF(o.tx, o.ty - 1) ? 4 : 0) | (isF(o.tx, o.ty + 1) ? 8 : 0);
+      objInfo.set(o, { mask: m });
+      dynCols.push({ x: x + 5, y: y + 9, w: 6, h: 5 });
+      if (m & 1) dynCols.push({ x, y: y + 10, w: 6, h: 3 });
+      if (m & 2) dynCols.push({ x: x + 10, y: y + 10, w: 6, h: 3 });
+      if (m & 4) dynCols.push({ x: x + 6, y, w: 4, h: 10 });
+      if (m & 8) dynCols.push({ x: x + 6, y: y + 12, w: 4, h: 4 });
+    } else if (o.type === 'gate') {
+      const horiz = isF(o.tx - 1, o.ty) || isF(o.tx + 1, o.ty) || !(isF(o.tx, o.ty - 1) || isF(o.tx, o.ty + 1));
+      objInfo.set(o, { horiz });
+      if (!o.open) dynCols.push(horiz ? { x, y: y + 9, w: 16, h: 5 } : { x: x + 5, y, w: 6, h: 16 });
+    }
+  }
+}
+rebuildDyn();
 
 // ================= частицы и живность =================
 const parts = [], smoke = [], splashes = [], drops = [];
@@ -694,29 +986,29 @@ const butterflies = [0, 1, 2, 3].map(i => ({ x: (22 + i * 2) * TS, y: (12 + (i %
 
 // ================= ввод =================
 const keys = {};
-let modalOpen = false, sleeping = false;
-const paused = () => modalOpen || sleeping;
+let modalOpen = false, busy = false;
+const paused = () => modalOpen || busy;
 addEventListener('keydown', e => {
   if (e.code === 'Tab') e.preventDefault();
   if (modalOpen) { if (e.code === 'Escape' || e.code === 'KeyI' || e.code === 'Tab') closeModal(); return; }
-  if (sleeping) return;
+  if (busy) return;
   keys[e.code] = true;
   if (e.repeat) return;
   if (e.code === 'KeyE' || e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); act(); }
   else if (/^Digit[1-4]$/.test(e.code)) selectSlot(+e.code[5] - 1);
-  else if (e.code === 'KeyQ') cycleSeed();
+  else if (e.code === 'KeyQ') cycleQ();
   else if (e.code === 'KeyI' || e.code === 'Tab') openBag();
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
-const cvs = document.getElementById('game');
+const cvs = $('game');
 cvs.addEventListener('mousedown', e => { if (e.button === 0 && !document.body.classList.contains('touch')) act(); });
 addEventListener('wheel', e => { if (!modalOpen) selectSlot((state.sel + (e.deltaY > 0 ? 1 : 3)) % 4); }, { passive: true });
 
 const joy = { id: null, x: 0, y: 0 };
 if (matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window) document.body.classList.add('touch');
 {
-  const stick = document.getElementById('stick'), knob = document.getElementById('knob');
+  const stick = $('stick'), knob = $('knob');
   const upd = e => {
     const r = stick.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
     let dx = e.clientX - cx, dy = e.clientY - cy; const l = Math.hypot(dx, dy), m = 40;
@@ -728,7 +1020,8 @@ if (matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window) document
   stick.addEventListener('pointermove', e => { if (e.pointerId === joy.id) upd(e); });
   const end = e => { if (e.pointerId !== joy.id) return; joy.id = null; joy.x = joy.y = 0; knob.style.transform = ''; };
   stick.addEventListener('pointerup', end); stick.addEventListener('pointercancel', end);
-  document.getElementById('actBtn').addEventListener('pointerdown', e => { e.preventDefault(); act(); });
+  $('actBtn').addEventListener('pointerdown', e => { e.preventDefault(); act(); });
+  $('qBtn').addEventListener('pointerdown', e => { e.preventDefault(); if (!paused()) cycleQ(); });
 }
 
 // ================= действия =================
@@ -738,21 +1031,48 @@ function targetTile() {
   return { tx: Math.floor((player.x + dx * 12) / TS), ty: Math.floor((player.y - 2 + dy * 12) / TS) };
 }
 function isWaterTile(tx, ty) { return landV(tx + 0.5, ty + 0.5) < -0.1 && !onPier(tx * TS + 8, ty * TS + 8); }
-function canBuild(tx, ty) {
-  for (const [ox, oy] of [[0.05, 0.05], [0.95, 0.05], [0.05, 0.95], [0.95, 0.95], [0.5, 0.5]]) if (landV(tx + ox, ty + oy) < 1.3) return false;
-  if (pathDist(tx + 0.5, ty + 0.5) < 1.0 || bedAt(tx, ty)) return false;
+function canPlace(type, tx, ty) {
+  const minV = type === 'bed' ? 1.3 : 0.4;
+  for (const [ox, oy] of [[0.05, 0.05], [0.95, 0.05], [0.05, 0.95], [0.95, 0.95], [0.5, 0.5]]) if (landV(tx + ox, ty + oy) < minV) return false;
+  if (type === 'bed' && pathDist(tx + 0.5, ty + 0.5) < 1.0) return false;
+  if (bedAt(tx, ty) || objAt(tx, ty) || onPier(tx * TS + 8, ty * TS + 8)) return false;
   const x = tx * TS, y = ty * TS;
-  return !colliders.some(c => x < c.x + c.w && x + TS > c.x && y < c.y + c.h && y + TS > c.y);
+  if (colliders.some(c => x < c.x + c.w && x + TS > c.x && y < c.y + c.h && y + TS > c.y)) return false;
+  if (type !== 'bed') {
+    if (tx === DOOR.tx && ty === DOOR.ty + 1) return false;
+    if (player.x + 5 > x && player.x - 5 < x + TS && player.y + 1 > y && player.y - 4 < y + TS) return false;
+  }
+  return true;
 }
 const canSleep = () => { const h = hourOf(); return h >= 19 || h < 6; };
-const bagName = k => ITEMS[k].name.toLowerCase();
+const lower = k => ITEMS[k].name.toLowerCase();
+function chickenNear(tx, ty) {
+  const cx = tx * TS + 8, cy = ty * TS + 10;
+  return state.chickens.find(c => !c.inside && Math.hypot(c.x - cx, c.y - cy) < 11);
+}
 
-function getAction() {
+function getAction() { return state.scene === 'house' ? houseAction() : islandAction(); }
+function islandAction() {
   const { tx, ty } = targetTile(), tool = TOOLS[state.sel].key;
   if (tx === TRADER.tx && ty === TRADER.ty) return { hint: 'Поговорить с торговцем', run: openShop };
   if (tx === CHEST.tx && ty === CHEST.ty) return { hint: 'Открыть сундук для продажи', run: openChest };
-  if (tx === DOOR.tx && ty === DOOR.ty) return canSleep() ? { hint: 'Лечь спать до утра', run: sleep } : { hint: 'Домик. Спать можно с 19:00' };
+  if (tx === DOOR.tx && ty === DOOR.ty) return { hint: 'Войти в домик', run: enterHouse };
   if (tx === WELL.tx && ty === WELL.ty) return tool === 'can' ? { hint: 'Набрать воды из колодца', run: refill, anim: 1 } : { hint: 'Колодец — возьми лейку (3)' };
+  const o = objAt(tx, ty);
+  if (o) {
+    if (tool === 'sledge') return { hint: `Снести ${ITEMS[o.type].acc} в мешочек`, run: () => removeObj(o), anim: 1 };
+    if (o.type === 'coop') {
+      const n = chickensIn(o), hungry = state.chickens.filter(c => coopOf(c) === o && !c.fed).length;
+      if (o.eggs > 0) return { hint: `Собрать ${o.eggs} ${plural(o.eggs, 'яйцо', 'яйца', 'яиц')}`, run: () => collectEggs(o) };
+      return { hint: `Куриный домик: ${n}/${COOP_CAP} ${plural(n, 'курица', 'курицы', 'куриц')}, яиц нет${hungry ? ` · голодных: ${hungry}` : ''}` };
+    }
+    if (o.type === 'feeder') {
+      if (o.grain >= FEED_CAP) return { hint: `Кормушка полна (${o.grain}/${FEED_CAP})` };
+      return state.bag.wheat > 0 ? { hint: `Насыпать пшеницу в кормушку (${o.grain}/${FEED_CAP})`, run: () => fillFeeder(o) } : { hint: `Кормушка ${o.grain}/${FEED_CAP} — нужна пшеница в мешочке` };
+    }
+    if (o.type === 'gate') return { hint: o.open ? 'Закрыть калитку' : 'Открыть калитку', run: () => toggleGate(o) };
+    return { hint: 'Заборчик' };
+  }
   const b = bedAt(tx, ty);
   if (b) {
     if (tool === 'sledge') return { hint: ripe(b) ? 'Собрать урожай и снести грядку' : b.crop ? 'Снести грядку (росток пропадёт)' : 'Снести грядку в мешочек', run: () => removeBed(b), anim: 1 };
@@ -764,7 +1084,7 @@ function getAction() {
     if (!b.crop) {
       if (tool === 'seeds') {
         const n = state.bag[state.seedType];
-        return n > 0 ? { hint: `Посадить: ${bagName(state.seedType)} (${n})`, run: () => plant(b), anim: 1 } : { hint: `Нет: ${bagName(state.seedType)}. Q — другие семена, купить — у торговца` };
+        return n > 0 ? { hint: `Посадить: ${lower(state.seedType)} (${n})`, run: () => plant(b), anim: 1 } : { hint: `Нет: ${lower(state.seedType)}. Q — другие семена, купить — у торговца` };
       }
       return { hint: 'Пустая грядка — выбери семена (4)' };
     }
@@ -772,12 +1092,30 @@ function getAction() {
     return { hint: `${CROPS[b.crop].name}: ${pct}% · ${b.wet > 0 ? 'полито' : 'нужен полив!'}` };
   }
   if (isWaterTile(tx, ty)) return tool === 'can' ? { hint: 'Набрать воды', run: refill, anim: 1 } : null;
-  if (tool === 'hammer') {
-    if (!canBuild(tx, ty)) return landV(tx + 0.5, ty + 0.5) > 0 ? { hint: 'Здесь грядку не построить' } : null;
-    const n = state.bag.bed;
-    return n > 0 ? { hint: `Построить грядку (в мешочке: ${n})`, run: () => buildBed(tx, ty), anim: 1 } : { hint: 'В мешочке нет грядок — купи у торговца на пирсе' };
+  if (tool === 'hammer' && canPlace(state.buildType, tx, ty)) {
+    const k = state.buildType, n = state.bag[k];
+    return n > 0 ? { hint: `Поставить ${ITEMS[k].acc} (в мешочке: ${n}) · Q — другое`, run: () => build(k, tx, ty), anim: 1 } : { hint: `Нет: ${lower(k)}. Q — другая постройка, купить — у торговца` };
   }
+  const ch = chickenNear(tx, ty);
+  if (ch) return { hint: `Погладить курицу${ch.fed ? '' : ' (голодная)'}`, run: () => petChicken(ch) };
+  if (tool === 'hammer') return landV(tx + 0.5, ty + 0.5) > 0 ? { hint: 'Здесь ничего не поставить' } : null;
   return null;
+}
+function houseAction() {
+  const { tx, ty } = targetTile();
+  if (tx >= 9 && ty >= 3 && ty <= 5) return canSleep() ? { hint: 'Лечь спать до утра', run: sleep } : { hint: 'Кровать. Спать можно с 19:00' };
+  if (tx === 8 && ty === 3) return { hint: 'Тумбочка со свечой' };
+  if (tx >= 4 && tx <= 6 && ty <= 3) return { hint: 'Погреться у камина', run: warmUp };
+  if (tx >= 2 && tx <= 3 && ty >= 5 && ty <= 6) return { hint: 'Стол: кружка чая и свежий хлеб' };
+  if (tx <= 1 && ty >= 5 && ty <= 6) return { hint: 'Сесть на стул', run: sitDown };
+  if (tx <= 1 && ty === 3) return { hint: 'Фикус в горшке' };
+  if (ty <= 2 && ((tx >= 1 && tx <= 2) || (tx >= 7 && tx <= 8))) return { hint: windowText() };
+  if (tx === 5 && ty >= 8) return { hint: 'Выйти на улицу', run: exitHouse };
+  return null;
+}
+function windowText() {
+  if (state.rain.on) return 'За окном идёт дождь';
+  return isNight() ? 'За окном ночь и звёзды' : 'За окном солнечно';
 }
 function act() {
   if (paused()) return;
@@ -790,13 +1128,13 @@ function act() {
 }
 function harvest(b) {
   const C = CROPS[b.crop], x = b.tx * TS + 8, y = b.ty * TS + 6;
-  const n = b.crop === 'wheat' && Math.random() < 0.3 ? 2 : 1;
+  const n = C.yield();
   state.bag[C.item] += n;
   let extra = '';
   if (Math.random() < 0.25) { state.bag[C.seed]++; extra = ' и семечко'; }
-  burst(x, y, 14, b.crop === 'wheat' ? ['#f2cc4c', '#fbe590', '#c9962f'] : ['#f08a2b', '#4fae3c', '#ffb15a']);
+  burst(x, y, 14, C.col);
   b.crop = null; b.prog = 0;
-  toast(`+${n} ${ITEMS[C.item].name.toLowerCase()}${extra} → в мешочек`);
+  toast(`+${n} ${lower(C.item)}${extra} → в мешочек`);
   save();
 }
 function plant(b) {
@@ -818,10 +1156,19 @@ function refill() {
   toast('Лейка полна');
   save();
 }
-function buildBed(tx, ty) {
-  state.bag.bed--;
-  state.beds.push({ tx, ty, crop: null, prog: 0, wet: 0 });
+function build(type, tx, ty) {
+  state.bag[type]--;
+  if (type === 'bed') state.beds.push({ tx, ty, crop: null, prog: 0, wet: 0 });
+  else {
+    const o = { type, tx, ty };
+    if (type === 'coop') o.eggs = 0;
+    if (type === 'feeder') o.grain = 0;
+    if (type === 'gate') o.open = false;
+    state.objs.push(o);
+    rebuildDyn();
+  }
   burst(tx * TS + 8, ty * TS + 10, 12, ['#b07a45', '#cf9a5e', '#a06d44'], { up: 50 });
+  if (type === 'coop') toast('Домик готов — теперь у торговца можно купить курицу');
   save();
 }
 function removeBed(b) {
@@ -833,24 +1180,113 @@ function removeBed(b) {
   toast('Грядка убрана в мешочек');
   save();
 }
+function removeObj(o) {
+  if (o.type === 'coop') {
+    const living = state.chickens.filter(c => coopOf(c) === o);
+    if (living.length) {
+      const others = state.objs.filter(x => x.type === 'coop' && x !== o);
+      const free = others.reduce((s, x) => s + COOP_CAP - chickensIn(x), 0);
+      if (free < living.length) { toast('Курам некуда переехать — сначала поставь ещё один домик'); return; }
+      for (const c of living) {
+        const to = others.find(x => chickensIn(x) < COOP_CAP);
+        c.ctx = to.tx; c.cty = to.ty;
+      }
+      toast(`${living.length === 1 ? 'Курица переехала' : 'Курицы переехали'} в другой домик`);
+    }
+    if (o.eggs) { state.bag.egg += o.eggs; toast(`+${o.eggs} ${plural(o.eggs, 'яйцо', 'яйца', 'яиц')}`); }
+  }
+  if (o.type === 'feeder' && o.grain) state.bag.wheat += o.grain;
+  state.objs.splice(state.objs.indexOf(o), 1);
+  state.bag[o.type]++;
+  rebuildDyn();
+  burst(o.tx * TS + 8, o.ty * TS + 10, 16, ['#8a5a30', '#b07a45', '#c44d3a', '#6c7078'], { up: 80, sp: 90 });
+  toast(`${ITEMS[o.type].name} — в мешочке`);
+  save();
+}
+function collectEggs(o) {
+  const n = o.eggs;
+  state.bag.egg += n; o.eggs = 0;
+  burst(o.tx * TS + 8, o.ty * TS + 2, 10, ['#fbf3e0', '#ffffff', '#e6d8bb'], { up: 60 });
+  toast(`+${n} ${plural(n, 'яйцо', 'яйца', 'яиц')} → в мешочек`);
+  save();
+}
+function fillFeeder(o) {
+  const n = Math.min(FEED_CAP - o.grain, state.bag.wheat);
+  o.grain += n; state.bag.wheat -= n;
+  burst(o.tx * TS + 8, o.ty * TS + 6, 10, CROPS.wheat.col, { up: 30, sp: 40 });
+  toast(`Насыпано ${n} пшеницы · кормушка ${o.grain}/${FEED_CAP}`);
+  save();
+}
+function toggleGate(o) {
+  o.open = !o.open; o.closeT = 0;
+  rebuildDyn();
+  save();
+}
+function petChicken(ch) {
+  ch.wait = 1.2; ch.gx = null;
+  burst(ch.x, ch.y - 10, 4, ['#ff6a8a', '#ffb0c0'], { up: 25, sp: 20, g: -10, life: 0.9 });
+}
+function buyChicken() {
+  const c = coopWithSpace();
+  if (!c || state.coins < ITEMS.chicken.buy) return;
+  state.coins -= ITEMS.chicken.buy;
+  state.chickens.push({ ctx: c.tx, cty: c.ty, x: c.tx * TS + 8, y: c.ty * TS + 20, fed: false, layAt: 0, color: Math.random() < 0.5 ? 0 : 1, inside: isNight(), face: 1 });
+  toast('Курица поселилась в домике');
+}
 function selectSlot(i) { state.sel = i; updateHUD(true); }
-function cycleSeed() {
-  state.seedType = state.seedType === 'seedWheat' ? 'seedCarrot' : 'seedWheat';
-  state.sel = 3;
-  toast(`В руке: ${bagName(state.seedType)} (${state.bag[state.seedType]})`);
+function cycleQ() {
+  if (state.sel === 0) {
+    state.buildType = BUILDS[(BUILDS.indexOf(state.buildType) + 1) % BUILDS.length];
+    toast(`Молоток: ${ITEMS[state.buildType].acc} (${state.bag[state.buildType]})`);
+  } else {
+    state.seedType = SEEDS[(SEEDS.indexOf(state.seedType) + 1) % SEEDS.length];
+    state.sel = 3;
+    toast(`В руке: ${lower(state.seedType)} (${state.bag[state.seedType]})`);
+  }
   updateHUD(true);
 }
 
-// ================= время и погода =================
+// ---- домик ----
+function fadeThen(fn, text = '') {
+  busy = true;
+  const f = $('fade');
+  f.textContent = text; f.style.transitionDuration = text ? '.7s' : '.3s'; f.style.opacity = 1;
+  setTimeout(() => {
+    fn(); updateCamera();
+    setTimeout(() => { f.style.opacity = 0; busy = false; }, text ? 500 : 120);
+  }, text ? 900 : 320);
+}
+function enterHouse() {
+  fadeThen(() => { state.scene = 'house'; player.x = 88; player.y = 130; player.dir = 1; parts.length = 0; save(); });
+}
+function exitHouse() {
+  player.sit = false;
+  fadeThen(() => { state.scene = 'island'; player.x = DOOR.tx * TS + 8; player.y = (DOOR.ty + 1) * TS + 10; player.dir = 0; parts.length = 0; save(); });
+}
+function warmUp() {
+  burst(88, 40, 14, ['#ffd66b', '#ff9a3a', '#fff2b0'], { up: 40, sp: 40, g: -40, life: 0.9 });
+  toast('Тепло и уютно');
+}
+function sitDown() { player.sit = true; player.x = 15; player.y = 97; player.dir = 2; }
+
+// ================= время, погода, курицы =================
 function startRain(mins) { state.rain.on = true; state.rain.left = mins; toast('Пошёл дождь — он польёт все грядки'); }
 function checkPayout() {
   const idx = Math.floor((state.t - 360) / DAY);
   if (idx <= state.paidIdx) return;
   state.paidIdx = idx;
-  const sum = state.chest.wheat * ITEMS.wheat.sell + state.chest.carrot * ITEMS.carrot.sell;
+  const sum = PRODUCE.reduce((s, k) => s + state.chest[k] * ITEMS[k].sell, 0);
   toast(`Наступил день ${dayNum()}`);
-  if (sum > 0) { state.coins += sum; state.chest.wheat = state.chest.carrot = 0; toast(`Скупщик забрал урожай из сундука: +${sum} монет`); }
+  if (sum > 0) { state.coins += sum; for (const k of PRODUCE) state.chest[k] = 0; toast(`Скупщик забрал товар из сундука: +${sum} монет`); }
   save();
+}
+function layEggs(upTo) {
+  for (const ch of state.chickens) {
+    if (!ch.fed || ch.layAt > upTo) continue;
+    ch.fed = false;
+    const coop = coopOf(ch);
+    if (coop && coop.eggs < EGG_CAP) coop.eggs++;
+  }
 }
 function advanceTime(dm) {
   state.t += dm;
@@ -865,12 +1301,10 @@ function advanceTime(dm) {
     if (b.crop && b.wet > 0) b.prog = Math.min(CROPS[b.crop].grow, b.prog + dm);
     b.wet = Math.max(0, b.wet - dm);
   }
+  layEggs(state.t);
 }
 function sleep() {
-  sleeping = true;
-  const fade = document.getElementById('fade');
-  fade.textContent = 'Z z z…'; fade.style.opacity = 1;
-  setTimeout(() => {
+  fadeThen(() => {
     const target = (Math.floor((state.t - 360) / DAY) + 1) * DAY + 360, skip = target - state.t;
     const nightRain = Math.random() < 0.35;
     for (const b of state.beds) {
@@ -878,13 +1312,77 @@ function sleep() {
       if (b.crop) b.prog = Math.min(CROPS[b.crop].grow, b.prog + grow);
       b.wet = nightRain ? WET_MAX : Math.max(0, b.wet - skip);
     }
+    layEggs(target);
+    for (const ch of state.chickens) ch.inside = true;
     state.t = target; state.rain.on = false; rainI = 0; drops.length = 0;
-    player.dir = 0;
+    player.x = 136; player.y = 100; player.dir = 0; player.sit = false;
     checkPayout();
     toast(nightRain ? 'Ночью шёл дождь — грядки политы' : 'Доброе утро!');
+    if (state.objs.some(o => o.type === 'coop' && o.eggs > 0)) toast('В курятнике есть яйца!');
     save();
-    setTimeout(() => { fade.style.opacity = 0; sleeping = false; }, 500);
-  }, 900);
+  }, 'Z z z…');
+}
+function nearestFeeder(ch) {
+  let best = null, bd = 12 * TS;
+  for (const o of state.objs) if (o.type === 'feeder' && o.grain > 0) {
+    const d = Math.hypot(o.tx * TS + 8 - ch.x, o.ty * TS + 17 - ch.y);
+    if (d < bd) { bd = d; best = o; }
+  }
+  return best;
+}
+function chickBlocked(x, y) {
+  const L = x - 3, R = x + 3, T = y - 2, B = y + 1;
+  if (!walkable(L, T) || !walkable(R, T) || !walkable(L, B) || !walkable(R, B)) return true;
+  const hit = c => L < c.x + c.w && R > c.x && T < c.y + c.h && B > c.y;
+  return colliders.some(hit) || dynCols.some(hit);
+}
+// шаг курицы к точке; false — пришла или упёрлась
+function stepChicken(ch, gx, gy, dt, mul) {
+  const dx = gx - ch.x, dy = gy - ch.y, d = Math.hypot(dx, dy);
+  if (d < 2) return false;
+  const s = Math.min(d, 16 * mul * dt), nx = ch.x + dx / d * s, ny = ch.y + dy / d * s;
+  if (Math.abs(dx) > 0.5) ch.face = dx > 0 ? 1 : -1;
+  const stuck = chickBlocked(ch.x, ch.y);
+  let moved = false;
+  if (stuck || !chickBlocked(nx, ch.y)) { ch.x = nx; moved = true; }
+  if (stuck || !chickBlocked(ch.x, ny)) { ch.y = ny; moved = true; }
+  ch.moving = moved;
+  return moved;
+}
+function updateChickens(dt) {
+  const h = hourOf(), night = h >= 20 || h < 6, deep = h >= 21 || h < 6;
+  for (const ch of state.chickens) {
+    const coop = coopOf(ch);
+    ch.moving = false; ch.anim = (ch.anim || 0) + dt;
+    if (!coop) continue;
+    const door = { x: coop.tx * TS + 8, y: coop.ty * TS + 20 };
+    if (ch.inside) {
+      if (!night) { ch.inside = false; ch.x = door.x + (Math.random() - 0.5) * 8; ch.y = door.y; ch.wait = 0.5 + Math.random() * 2; ch.gx = null; }
+      continue;
+    }
+    if (night) {
+      if (deep || Math.hypot(ch.x - door.x, ch.y - door.y) < 5) { ch.inside = true; continue; }
+      stepChicken(ch, door.x, door.y, dt, 1.6);
+      continue;
+    }
+    if (ch.peck > 0) { ch.peck -= dt; continue; }
+    ch.feedCD = Math.max(0, (ch.feedCD || 0) - dt);
+    if (!ch.fed && !ch.feedCD) {
+      const f = nearestFeeder(ch);
+      if (f) {
+        const fx = f.tx * TS + 8, fy = f.ty * TS + 17;
+        if (Math.hypot(ch.x - fx, ch.y - fy) < 9) {
+          f.grain--; ch.fed = true; ch.layAt = state.t + 240 + Math.random() * 120; ch.peck = 1.4;
+          continue;
+        }
+        if (stepChicken(ch, fx, fy, dt, 1.3)) continue;
+        ch.feedCD = 3;
+      }
+    }
+    if (ch.wait > 0) { ch.wait -= dt; if (Math.random() < dt * 0.6) ch.peck = 0.5; continue; }
+    if (ch.gx == null) { const a = Math.random() * Math.PI * 2, r = 8 + Math.random() * 56; ch.gx = ch.x + Math.cos(a) * r; ch.gy = ch.y + Math.sin(a) * r; }
+    if (!stepChicken(ch, ch.gx, ch.gy, dt, 1)) { ch.gx = null; ch.wait = 0.5 + Math.random() * 2.5; }
+  }
 }
 // ключевые точки освещения: час, темнота, оттенок, сила оттенка
 const LIGHT_KEYS = [
@@ -915,7 +1413,7 @@ addEventListener('resize', resize); resize();
 
 let camX = 0, camY = 0, time = 0;
 function updateCamera() {
-  const ww = W * TS, wh = H * TS;
+  const ww = state.scene === 'house' ? IW * TS : W * TS, wh = state.scene === 'house' ? IH * TS : H * TS;
   camX = view.w >= ww ? Math.round((view.w - ww) / -2) : Math.round(Math.max(0, Math.min(ww - view.w, player.x - view.w / 2)));
   camY = view.h >= wh ? Math.round((view.h - wh) / -2) : Math.round(Math.max(0, Math.min(wh - view.h, player.y - 8 - view.h / 2)));
 }
@@ -924,6 +1422,16 @@ function shadow(x, y, r) {
   ctx.fillStyle = 'rgba(30,25,45,.28)';
   const sx = Math.round(x) - camX, sy = Math.round(y) - camY;
   ctx.fillRect(sx - r, sy - 1, r * 2, 2); ctx.fillRect(sx - r + 2, sy - 2, r * 2 - 4, 1); ctx.fillRect(sx - r + 2, sy + 1, r * 2 - 4, 1);
+}
+function blocked(x, y) {
+  const L = x - 5, R = x + 5, T = y - 4, B = y + 1;
+  const hit = c => L < c.x + c.w && R > c.x && T < c.y + c.h && B > c.y;
+  if (state.scene === 'house') {
+    if (!houseWalk(L, T) || !houseWalk(R, T) || !houseWalk(L, B) || !houseWalk(R, B)) return true;
+    return HOUSE_COLS.some(hit);
+  }
+  if (!walkable(L, T) || !walkable(R, T) || !walkable(L, B) || !walkable(R, B)) return true;
+  return colliders.some(hit) || dynCols.some(hit);
 }
 
 function update(dt) {
@@ -935,19 +1443,26 @@ function update(dt) {
     let my = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0) + joy.y;
     const l = Math.hypot(mx, my);
     player.moving = l > 0.2;
+    if (player.moving && player.sit) { player.sit = false; player.x = 15; player.y = 106; }
     if (player.moving) {
       if (l > 1) { mx /= l; my /= l; }
       player.dir = Math.abs(mx) > Math.abs(my) ? (mx > 0 ? 2 : 3) : (my > 0 ? 0 : 1);
-      const sp = 72 * dt;
-      if (!blocked(player.x + mx * sp, player.y)) player.x += mx * sp;
-      if (!blocked(player.x, player.y + my * sp)) player.y += my * sp;
+      const sp = 72 * dt, stuck = blocked(player.x, player.y);
+      if (stuck || !blocked(player.x + mx * sp, player.y)) player.x += mx * sp;
+      if (stuck || !blocked(player.x, player.y + my * sp)) player.y += my * sp;
       player.walkT += dt;
     } else player.walkT = 0;
     player.actT = Math.max(0, player.actT - dt);
+    if (state.scene === 'house' && player.y > 140) exitHouse();
+    updateChickens(dt);
+    for (const o of state.objs) if (o.type === 'gate' && o.open) {
+      const far = state.scene !== 'island' || Math.hypot(player.x - o.tx * TS - 8, player.y - o.ty * TS - 10) > 26;
+      o.closeT = far ? (o.closeT || 0) + dt : 0;
+      if (o.closeT > 1.2) { o.open = false; o.closeT = 0; rebuildDyn(); }
+    }
   }
   rainI += ((state.rain.on ? 1 : 0) - rainI) * Math.min(1, dt * 0.6);
   updateCamera();
-  // частицы
   for (let i = parts.length - 1; i >= 0; i--) {
     const p = parts[i]; p.t += dt; p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt;
     if (p.t > p.life) parts.splice(i, 1);
@@ -957,7 +1472,10 @@ function update(dt) {
     const s = smoke[i]; s.t += dt; s.y -= 9 * dt; s.x += (6 + Math.sin(s.t * 2) * 4) * dt;
     if (s.t > s.life) smoke.splice(i, 1);
   }
-  // дождь
+  if (state.scene === 'house') {
+    if (Math.random() < dt * 3) parts.push({ x: 80 + Math.random() * 16, y: 40, vx: (Math.random() - 0.5) * 10, vy: -15 - Math.random() * 15, g: -5, life: 0.6 + Math.random() * 0.5, t: 0, c: Math.random() < 0.5 ? '#ffd66b' : '#ff9a3a' });
+    return;
+  }
   const want = Math.floor(170 * rainI * view.w * view.h / (320 * 180));
   while (drops.length < want) drops.push(newDrop(true));
   if (drops.length > want) drops.length = want;
@@ -967,7 +1485,6 @@ function update(dt) {
     if (d.life <= 0) { splashes.push({ x: d.x + camX, y: d.y + camY, t: 0 }); Object.assign(d, newDrop(false)); }
   }
   for (let i = splashes.length - 1; i >= 0; i--) if ((splashes[i].t += dt) > 0.3) splashes.splice(i, 1);
-  // светлячки и бабочки
   for (const f of flies) {
     f.ph += dt;
     f.vx += (Math.random() - 0.5) * 40 * dt + (f.hx - f.x) * 0.02 * dt; f.vy += (Math.random() - 0.5) * 40 * dt + (f.hy - f.y) * 0.02 * dt;
@@ -988,13 +1505,100 @@ function newDrop(anyY) {
   const y = anyY ? Math.random() * view.h : -8 - Math.random() * 30, spd = 210 + Math.random() * 70;
   return { x: Math.random() * (view.w + 40), y, spd, len: 4 + Math.floor(Math.random() * 4), life: Math.max(0.05, (Math.random() * view.h - y) / spd) };
 }
-function blocked(x, y) {
-  const L = x - 5, R = x + 5, T = y - 4, B = y + 1;
-  if (!walkable(L, T) || !walkable(R, T) || !walkable(L, B) || !walkable(R, B)) return true;
-  return colliders.some(c => L < c.x + c.w && R > c.x && T < c.y + c.h && B > c.y);
+
+// затемнение с «дырками» от источников света и тёплым свечением
+function applyLighting(dark, tint, tintA, lights, rainA) {
+  const vw = view.w, vh = view.h;
+  if (tintA > 0.01) {
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = `rgba(${tint[0]},${tint[1]},${tint[2]},${tintA})`; ctx.fillRect(0, 0, vw, vh);
+  }
+  if (rainA > 0.01) {
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = `rgba(120,135,165,${0.45 * rainA})`; ctx.fillRect(0, 0, vw, vh);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  if (dark <= 0.01) return;
+  lctx.globalCompositeOperation = 'source-over'; lctx.clearRect(0, 0, vw, vh);
+  lctx.fillStyle = `rgba(10,14,46,${dark})`; lctx.fillRect(0, 0, vw, vh);
+  lctx.globalCompositeOperation = 'destination-out';
+  for (const L of lights) {
+    const sx = L.x - camX, sy = L.y - camY, r = L.r;
+    if (sx < -r || sy < -r || sx > vw + r || sy > vh + r) continue;
+    const gr = lctx.createRadialGradient(sx, sy, 0, sx, sy, r);
+    gr.addColorStop(0, 'rgba(0,0,0,.95)'); gr.addColorStop(0.5, 'rgba(0,0,0,.6)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    lctx.fillStyle = gr; lctx.fillRect(sx - r, sy - r, r * 2, r * 2);
+  }
+  ctx.drawImage(lightC, 0, 0);
+  ctx.globalCompositeOperation = 'lighter';
+  for (const L of lights) {
+    if (!L.a) continue;
+    const sx = L.x - camX, sy = L.y - camY, r = L.r * 0.6;
+    const gr = ctx.createRadialGradient(sx, sy, 0, sx, sy, r);
+    gr.addColorStop(0, `rgba(255,180,90,${L.a})`); gr.addColorStop(1, 'rgba(255,180,90,0)');
+    ctx.fillStyle = gr; ctx.fillRect(sx - r, sy - r, r * 2, r * 2);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+}
+function drawCursor() {
+  if (paused()) return;
+  const a = getAction();
+  if (!a) return;
+  const t = targetTile();
+  ctx.fillStyle = a.run ? 'rgba(255,250,225,.95)' : 'rgba(255,250,225,.4)';
+  const x = t.tx * TS - camX, y = t.ty * TS - camY, k = a.run && Math.floor(time * 3) % 2 ? 1 : 0;
+  for (const [cx, cy, sx, sy] of [[x - k, y - k, 1, 1], [x + 15 + k, y - k, -1, 1], [x - k, y + 15 + k, 1, -1], [x + 15 + k, y + 15 + k, -1, -1]]) {
+    ctx.fillRect(sx > 0 ? cx : cx - 3, cy, 4, 1); ctx.fillRect(cx, sy > 0 ? cy : cy - 3, 1, 4);
+  }
+}
+function drawParts() {
+  for (const p of parts) {
+    ctx.globalAlpha = Math.max(0, 1 - (p.t / p.life) ** 2); ctx.fillStyle = p.c;
+    ctx.fillRect(Math.round(p.x) - camX, Math.round(p.y) - camY, 1, 1);
+  }
+  ctx.globalAlpha = 1;
+}
+function drawExclaim(x, y) {
+  const sx = Math.round(x) - camX, sy = Math.round(y) - camY + Math.round(Math.sin(time * 5) * 1.5);
+  ctx.fillStyle = '#4a2f1d'; ctx.fillRect(sx - 3, sy - 12, 7, 11); ctx.fillRect(sx - 1, sy - 1, 3, 1); ctx.fillRect(sx, sy, 1, 1);
+  ctx.fillStyle = '#f2cc4c'; ctx.fillRect(sx - 2, sy - 11, 5, 9);
+  ctx.fillStyle = '#4a2f1d'; ctx.fillRect(sx, sy - 10, 1, 4); ctx.fillRect(sx, sy - 5, 1, 1);
+}
+function drawPlayer() {
+  const f = player.moving ? [1, 0, 2, 0][Math.floor(player.walkT * 8) % 4] : 0;
+  if (player.sit) { blit(SPR.farmer[2][0], player.x - 9, player.y - 26); return; }
+  shadow(player.x, player.y, 5);
+  const spr = SPR.farmer[player.dir][f];
+  if (player.actT > 0 && player.actIcon) {
+    const [dx, dy] = DIRV[player.dir], up = player.actT > 0.15;
+    const ix = player.x - 8 + dx * 9 + (dx === 0 ? 6 : 0), iy = player.y - 20 + dy * 6 + (up ? -4 : 2);
+    if (player.dir === 1) { blit(player.actIcon, ix, iy); blit(spr, player.x - 9, player.y - 23); }
+    else { blit(spr, player.x - 9, player.y - 23); blit(player.actIcon, ix, iy); }
+  } else blit(spr, player.x - 9, player.y - 23);
+}
+function drawObj(o) {
+  const x = o.tx * TS, y = o.ty * TS;
+  if (o.type === 'coop') { shadow(x + 8, y + 15, 8); blit(SPR.coop, x - 2, y - 11); }
+  else if (o.type === 'feeder') { shadow(x + 8, y + 15, 7); blit(SPR.feeder[o.grain <= 0 ? 0 : o.grain <= FEED_CAP / 2 ? 1 : 2], x - 1, y + 3); }
+  else if (o.type === 'fence') blit(SPR.fence[(objInfo.get(o) || { mask: 0 }).mask], x - 1, y - 1);
+  else if (o.type === 'gate') { const h = (objInfo.get(o) || { horiz: true }).horiz; blit(SPR.gate[(h ? 'h' : 'v') + (o.open ? 'O' : 'C')], x - 1, y - 1); }
+}
+function drawChicken(ch) {
+  const fr = ch.peck > 0 ? 2 : ch.moving ? (Math.floor(ch.anim * 8) % 2 ? 1 : 0) : 0;
+  shadow(ch.x, ch.y, 3);
+  blit((ch.face < 0 ? SPR.chickenL : SPR.chickenR)[ch.color][fr], ch.x - 7, ch.y - 11);
+}
+function ghostFor(type, tx, ty) {
+  const x = tx * TS, y = ty * TS;
+  if (type === 'bed') blit(SPR.bedDry, x, y);
+  else if (type === 'coop') blit(SPR.coop, x - 2, y - 11);
+  else if (type === 'feeder') blit(SPR.feeder[0], x - 1, y + 3);
+  else if (type === 'fence') blit(SPR.fence[0], x - 1, y - 1);
+  else blit(SPR.gate.hC, x - 1, y - 1);
 }
 
-function render() {
+function render() { if (state.scene === 'house') renderHouse(); else renderIsland(); }
+function renderIsland() {
   const vw = view.w, vh = view.h, LT = lightAt(hourOf());
   const dark = Math.min(0.72, LT.dark + 0.12 * rainI), lit = dark > 0.12;
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
@@ -1004,7 +1608,6 @@ function render() {
   ctx.globalAlpha = 0.55 + 0.45 * wave; ctx.drawImage(GROUND.foamA, -camX, -camY);
   ctx.globalAlpha = 0.55 - 0.45 * wave; ctx.drawImage(GROUND.foamB, -camX, -camY);
   ctx.globalAlpha = 1;
-  // блики на воде
   ctx.fillStyle = 'rgba(220,245,255,.75)';
   for (let ty = Math.floor(camY / TS); ty <= (camY + vh) / TS; ty++) for (let tx = Math.floor(camX / TS); tx <= (camX + vw) / TS; tx++) {
     const h = hash(tx * 7, ty * 13);
@@ -1012,33 +1615,34 @@ function render() {
     const ph = (time * 0.7 + h * 20) % 3;
     if (ph < 1.2) ctx.fillRect(tx * TS + Math.floor(h * 30) % 12 - camX, ty * TS + Math.floor(h * 97) % 13 - camY, ph < 0.6 ? 3 : 2, 1);
   }
-  // лодка качается
   const bob = Math.round(Math.sin(time * 1.3));
   ctx.fillStyle = 'rgba(220,245,255,.6)';
   ctx.fillRect(BOAT.x - camX + 2, BOAT.y + 16 + bob - camY, 36, 1);
   blit(SPR.boat, BOAT.x - 1, BOAT.y - 1 + bob);
-  // грядки
   for (const b of state.beds) blit(b.wet > 0 ? SPR.bedWet : SPR.bedDry, b.tx * TS, b.ty * TS);
-  const tgt = targetTile(), tool = TOOLS[state.sel].key;
-  if (tool === 'hammer' && state.bag.bed > 0 && canBuild(tgt.tx, tgt.ty) && !paused()) {
-    ctx.globalAlpha = 0.45 + 0.15 * Math.sin(time * 6); blit(SPR.bedDry, tgt.tx * TS, tgt.ty * TS); ctx.globalAlpha = 1;
+  const tgt = targetTile();
+  if (TOOLS[state.sel].key === 'hammer' && state.bag[state.buildType] > 0 && canPlace(state.buildType, tgt.tx, tgt.ty) && !paused()) {
+    ctx.globalAlpha = 0.45 + 0.15 * Math.sin(time * 6); ghostFor(state.buildType, tgt.tx, tgt.ty); ctx.globalAlpha = 1;
   }
-  // объекты по глубине
   const list = [];
   for (const p of props) list.push(p);
   for (const b of state.beds) if (b.crop) list.push({ y: b.ty * TS + 14, crop: b });
+  for (const o of state.objs) list.push({ y: o.ty * TS + (o.type === 'coop' ? 15 : 14), obj: o });
+  for (const ch of state.chickens) if (!ch.inside) list.push({ y: ch.y, chick: ch });
   list.push({ y: player.y, who: 'player' }, { y: TRADER.ty * TS + 14, who: 'trader' });
   list.sort((a, b) => a.y - b.y);
   for (const o of list) {
     if (o.crop) {
       const b = o.crop, st = stageOf(b);
-      const spr = b.crop === 'wheat' ? SPR.wheat[st === 4 ? 4 + (Math.floor(time * 1.5 + b.tx * 0.7 + b.ty * 0.3) % 2) : st] : SPR.carrot[st];
+      const spr = b.crop === 'wheat' ? SPR.wheat[st === 4 ? 4 + (Math.floor(time * 1.5 + b.tx * 0.7 + b.ty * 0.3) % 2) : st] : SPR[b.crop][st];
       blit(spr, b.tx * TS, b.ty * TS - 8);
       if (st === 4 && (time * 0.8 + hash(b.tx, b.ty) * 5) % 2.5 < 0.35) {
         const sx = b.tx * TS + 4 + Math.floor(hash(b.ty, b.tx) * 8) - camX, sy = b.ty * TS - 6 - camY;
         ctx.fillStyle = '#fffbe0'; ctx.fillRect(sx, sy - 1, 1, 3); ctx.fillRect(sx - 1, sy, 3, 1);
       }
-    } else if (o.who === 'player') drawPlayer();
+    } else if (o.obj) drawObj(o.obj);
+    else if (o.chick) drawChicken(o.chick);
+    else if (o.who === 'player') drawPlayer();
     else if (o.who === 'trader') {
       const tx = TRADER.tx * TS + 8, ty = TRADER.ty * TS + 14;
       const dx = player.x - tx, dy = player.y - ty, near = Math.hypot(dx, dy) < 56;
@@ -1052,24 +1656,17 @@ function render() {
       if (o.spr === SPR.house) drawWindows(dark);
     }
   }
-  // дым
   for (const s of smoke) {
     ctx.fillStyle = `rgba(225,225,230,${0.55 * (1 - s.t / s.life)})`;
     ctx.fillRect(Math.round(s.x) - camX, Math.round(s.y) - camY, s.s + Math.floor(s.t), s.s + Math.floor(s.t));
   }
-  for (const p of parts) {
-    ctx.globalAlpha = Math.max(0, 1 - (p.t / p.life) ** 2); ctx.fillStyle = p.c;
-    ctx.fillRect(Math.round(p.x) - camX, Math.round(p.y) - camY, 1, 1);
-  }
-  ctx.globalAlpha = 1;
-  // бабочки днём
+  drawParts();
   if (dark < 0.2 && rainI < 0.3) for (const b of butterflies) {
     const sx = Math.round(b.x) - camX, sy = Math.round(b.y) - camY, open = Math.sin(b.ph) > 0;
     ctx.fillStyle = b.c;
     if (open) { ctx.fillRect(sx - 2, sy, 2, 2); ctx.fillRect(sx + 1, sy, 2, 2); } else { ctx.fillRect(sx - 1, sy, 1, 2); ctx.fillRect(sx + 1, sy, 1, 2); }
     ctx.fillStyle = '#3a2418'; ctx.fillRect(sx, sy, 1, 2);
   }
-  // дождь
   if (rainI > 0.01) {
     ctx.fillStyle = 'rgba(195,215,245,.6)';
     for (const d of drops) ctx.fillRect(Math.round(d.x), Math.round(d.y), 1, d.len);
@@ -1080,36 +1677,10 @@ function render() {
       else { ctx.fillRect(sx - 2, sy, 1, 1); ctx.fillRect(sx + 2, sy, 1, 1); ctx.fillRect(sx - 1, sy - 1, 3, 1); }
     }
   }
-  // освещение
-  if (LT.tintA > 0.01) {
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = `rgba(${LT.tint[0]},${LT.tint[1]},${LT.tint[2]},${LT.tintA})`; ctx.fillRect(0, 0, vw, vh);
-  }
-  if (rainI > 0.01) {
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = `rgba(120,135,165,${0.45 * rainI})`; ctx.fillRect(0, 0, vw, vh);
-  }
-  ctx.globalCompositeOperation = 'source-over';
-  if (dark > 0.01) {
-    lctx.globalCompositeOperation = 'source-over'; lctx.clearRect(0, 0, vw, vh);
-    lctx.fillStyle = `rgba(10,14,46,${dark})`; lctx.fillRect(0, 0, vw, vh);
-    lctx.globalCompositeOperation = 'destination-out';
-    for (const L of LIGHTS) {
-      const sx = L.x - camX, sy = L.y - camY, r = L.r + Math.sin(time * 3 + L.x) * 1.5;
-      if (sx < -r || sy < -r || sx > vw + r || sy > vh + r) continue;
-      const gr = lctx.createRadialGradient(sx, sy, 0, sx, sy, r);
-      gr.addColorStop(0, 'rgba(0,0,0,.95)'); gr.addColorStop(0.5, 'rgba(0,0,0,.6)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
-      lctx.fillStyle = gr; lctx.fillRect(sx - r, sy - r, r * 2, r * 2);
-    }
-    ctx.drawImage(lightC, 0, 0);
+  applyLighting(dark, LT.tint, LT.tintA, LIGHTS.map(L => ({ x: L.x, y: L.y, r: L.r + Math.sin(time * 3 + L.x) * 1.5, a: 0.4 * dark })), rainI);
+  if (dark > 0.3 && rainI < 0.3) {
     ctx.globalCompositeOperation = 'lighter';
-    for (const L of LIGHTS) {
-      const sx = L.x - camX, sy = L.y - camY, r = L.r * 0.6;
-      const gr = ctx.createRadialGradient(sx, sy, 0, sx, sy, r);
-      gr.addColorStop(0, `rgba(255,190,90,${0.4 * dark})`); gr.addColorStop(1, 'rgba(255,190,90,0)');
-      ctx.fillStyle = gr; ctx.fillRect(sx - r, sy - r, r * 2, r * 2);
-    }
-    if (dark > 0.3 && rainI < 0.3) for (const f of flies) {
+    for (const f of flies) {
       const a = (Math.sin(f.ph * 2.3) * 0.5 + 0.5) * (dark - 0.3) * 3;
       if (a < 0.1) continue;
       const sx = Math.round(f.x) - camX, sy = Math.round(f.y) - camY;
@@ -1118,17 +1689,8 @@ function render() {
     }
     ctx.globalCompositeOperation = 'source-over';
   }
-  // рамка цели
-  if (!paused()) {
-    const a = getAction();
-    if (a) {
-      ctx.fillStyle = a.run ? 'rgba(255,250,225,.95)' : 'rgba(255,250,225,.4)';
-      const x = tgt.tx * TS - camX, y = tgt.ty * TS - camY, k = a.run && Math.floor(time * 3) % 2 ? 1 : 0;
-      for (const [cx, cy, sx, sy] of [[x - k, y - k, 1, 1], [x + 15 + k, y - k, -1, 1], [x - k, y + 15 + k, 1, -1], [x + 15 + k, y + 15 + k, -1, -1]]) {
-        ctx.fillRect(sx > 0 ? cx : cx - 3, cy, 4, 1); ctx.fillRect(cx, sy > 0 ? cy : cy - 3, 1, 4);
-      }
-    }
-  }
+  for (const o of state.objs) if (o.type === 'coop' && o.eggs > 0) drawExclaim(o.tx * TS + 8, o.ty * TS - 13);
+  drawCursor();
 }
 function drawWindows(dark) {
   const night = dark > 0.15;
@@ -1139,33 +1701,75 @@ function drawWindows(dark) {
     ctx.fillStyle = '#6e4527'; ctx.fillRect(x + 5, y, 2, 9); ctx.fillRect(x, y + 4, 12, 1);
   }
 }
-function drawPlayer() {
-  const f = player.moving ? [1, 0, 2, 0][Math.floor(player.walkT * 8) % 4] : 0;
-  shadow(player.x, player.y, 5);
-  const spr = SPR.farmer[player.dir][f];
-  if (player.actT > 0 && player.actIcon) {
-    const [dx, dy] = DIRV[player.dir], up = player.actT > 0.15;
-    const ix = player.x - 8 + dx * 9 + (dx === 0 ? 6 : 0), iy = player.y - 20 + dy * 6 + (up ? -4 : 2);
-    if (player.dir === 1) { blit(player.actIcon, ix, iy); blit(spr, player.x - 9, player.y - 23); }
-    else { blit(spr, player.x - 9, player.y - 23); blit(player.actIcon, ix, iy); }
-  } else blit(spr, player.x - 9, player.y - 23);
+function renderHouse() {
+  const vw = view.w, vh = view.h, LT = lightAt(hourOf());
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#140d10'; ctx.fillRect(0, 0, vw, vh);
+  ctx.drawImage(INTERIOR, -camX, -camY);
+  // окна
+  const nightSky = LT.dark > 0.45, dusk = LT.tintA > 0.15;
+  for (const wx of WIN_IN) {
+    const x = wx - camX, y = 10 - camY;
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, 24, 18); ctx.clip();
+    ctx.fillStyle = state.rain.on ? (nightSky ? '#1a2030' : '#8796a8') : nightSky ? '#1b2348' : dusk ? '#f0a070' : '#9fd3e8';
+    ctx.fillRect(x, y, 24, 18);
+    if (state.rain.on) {
+      ctx.fillStyle = 'rgba(220,235,255,.6)';
+      for (let i = 0; i < 7; i++) { const sx = Math.floor(hash(i, wx) * 24), sy = Math.floor((time * 30 + hash(wx, i) * 54) % 18); ctx.fillRect(x + sx, y + sy, 1, 3); }
+    } else if (nightSky) {
+      ctx.fillStyle = '#fff6c8';
+      for (let i = 0; i < 6; i++) ctx.fillRect(x + Math.floor(hash(i, wx) * 24), y + Math.floor(hash(wx, i) * 18), 1, 1);
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,.85)';
+      const cx = Math.floor((time * 2 + wx) % 40) - 10;
+      ctx.fillRect(x + cx, y + 5, 9, 2); ctx.fillRect(x + cx + 2, y + 4, 4, 1);
+    }
+    ctx.restore();
+    ctx.fillStyle = '#6e4527'; ctx.fillRect(x + 11, y, 2, 18); ctx.fillRect(x, y + 8, 24, 2);
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(x + 2, y + 2, 3, 1); ctx.fillRect(x + 2, y + 3, 1, 2);
+  }
+  // огонь в камине
+  const ox = -camX, oy = -camY;
+  for (let x = 76; x < 100; x += 2) {
+    const c = 1 - Math.abs(x - 87) / 13;
+    const hgt = Math.max(2, Math.round((6 + 10 * c) * (0.75 + 0.25 * Math.sin(time * 9 + x * 0.9) + 0.15 * Math.sin(time * 23 + x * 2.1))));
+    ctx.fillStyle = '#e8502a'; ctx.fillRect(x + ox, 47 - hgt + oy, 2, hgt);
+    ctx.fillStyle = '#ff9a3a'; ctx.fillRect(x + ox, 47 - Math.round(hgt * 0.7) + oy, 2, Math.round(hgt * 0.7));
+    ctx.fillStyle = '#ffd66b'; ctx.fillRect(x + ox, 47 - Math.round(hgt * 0.4) + oy, 2, Math.round(hgt * 0.4));
+  }
+  ctx.fillStyle = '#6e4527'; ctx.fillRect(78 + ox, 46 + oy, 20, 4);
+  ctx.fillStyle = '#8a5a30'; ctx.fillRect(80 + ox, 45 + oy, 16, 2);
+  ctx.fillStyle = '#c9a06a'; ctx.fillRect(78 + ox, 47 + oy, 1, 2); ctx.fillRect(97 + ox, 47 + oy, 1, 2);
+  const list = HOUSE_PROPS.map(p => ({ y: p.sy, p }));
+  list.push({ y: player.sit ? 100 : player.y, who: 'player' });
+  list.sort((a, b) => a.y - b.y);
+  for (const o of list) {
+    if (o.p) blit(o.p.spr, o.p.x, o.p.y);
+    else drawPlayer();
+  }
+  drawParts();
+  const fl = Math.sin(time * 9) * 3 + Math.sin(time * 13) * 2;
+  const lights = [{ x: 88, y: 42, r: 88 + fl, a: 0.35 + 0.05 * Math.sin(time * 11) }];
+  if (LT.dark > 0.15) lights.push({ x: 136, y: 48, r: 32, a: 0.25 });
+  if (LT.dark < 0.35) for (const wx of WIN_IN) lights.push({ x: wx + 12, y: 36, r: 46 * (1 - LT.dark * 2) });
+  applyLighting(Math.min(0.72, 0.14 + LT.dark * 0.8 + 0.08 * rainI), [255, 205, 160], 0.12, lights, 0);
+  drawCursor();
 }
 
 // ================= интерфейс =================
-const $ = id => document.getElementById(id);
 $('coinIcon').src = ICON_URL.coin;
 const hotbar = $('hotbar');
 TOOLS.forEach((t, i) => {
   const s = document.createElement('div');
   s.className = 'slot'; s.title = t.name;
-  s.innerHTML = `<img><span class="num">${i + 1}</span>`;
-  s.addEventListener('pointerdown', e => { e.preventDefault(); if (i === 3 && state.sel === 3) cycleSeed(); else selectSlot(i); });
+  s.innerHTML = `<img class="main"><span class="num">${i + 1}</span><div class="x"></div>`;
+  s.addEventListener('pointerdown', e => { e.preventDefault(); if ((i === 3 || i === 0) && state.sel === i) cycleQ(); else selectSlot(i); });
   hotbar.appendChild(s);
 });
 {
   const s = document.createElement('div');
   s.className = 'slot bagslot'; s.title = 'Мешочек (I)';
-  s.innerHTML = `<img src="${ICON_URL.bag}"><span class="num">I</span>`;
+  s.innerHTML = `<img class="main" src="${ICON_URL.bag}"><span class="num">I</span>`;
   s.addEventListener('pointerdown', e => { e.preventDefault(); openBag(); });
   hotbar.appendChild(s);
 }
@@ -1179,14 +1783,14 @@ function updateHUD(force) {
   $('coins').textContent = state.coins;
   [...hotbar.children].slice(0, 4).forEach((s, i) => {
     s.classList.toggle('sel', state.sel === i);
-    const key = i === 3 ? state.seedType : TOOLS[i].key, img = s.querySelector('img');
+    const key = i === 3 ? state.seedType : TOOLS[i].key, img = s.querySelector('img.main');
     if (img.dataset.k !== key) { img.src = ICON_URL[key]; img.dataset.k = key; }
     let extra = '';
+    if (i === 0) extra = `<img class="mini" src="${ICON_URL[state.buildType]}"><span class="cnt">${state.bag[state.buildType]}</span>`;
     if (i === 2) extra = `<div class="bar"><i style="width:${state.water / CAN_MAX * 100}%"></i></div>`;
     if (i === 3) extra = `<span class="cnt">${state.bag[state.seedType]}</span>`;
-    let ex = s.querySelector('.x');
-    if (!ex) { ex = document.createElement('div'); ex.className = 'x'; s.appendChild(ex); }
-    if (ex.innerHTML !== extra) ex.innerHTML = extra;
+    const ex = s.querySelector('.x');
+    if (ex.dataset.v !== extra) { ex.innerHTML = extra; ex.dataset.v = extra; }
   });
   const a = paused() ? null : getAction();
   const txt = a ? (a.run ? `E — ${a.hint}` : a.hint) : '';
@@ -1217,51 +1821,63 @@ $('modalBody').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b || b.disabled) return;
   const d = b.dataset;
   if (d.buy) { const n = +d.n, cost = ITEMS[d.buy].buy * n; if (state.coins >= cost) { state.coins -= cost; state.bag[d.buy] += n; } }
+  if (d.chicken) buyChicken();
   if (d.put) { const n = d.n === 'all' ? state.bag[d.put] : 1; state.bag[d.put] -= n; state.chest[d.put] += n; }
   if (d.take) { state.bag[d.take] += state.chest[d.take]; state.chest[d.take] = 0; }
-  if (d.hand) { state.seedType = d.hand; state.sel = 3; closeModal(); toast(`В руке: ${bagName(d.hand)}`); return; }
+  if (d.hand) { state.seedType = d.hand; state.sel = 3; closeModal(); toast(`В руке: ${lower(d.hand)}`); return; }
+  if (d.build) { state.buildType = d.build; state.sel = 0; closeModal(); toast(`Молоток: ${ITEMS[d.build].acc}`); return; }
   if (d.reset === 'ask') { b.outerHTML = '<span style="margin-right:8px">Весь прогресс пропадёт.</span><button class="px red" data-reset="yes">Да, заново</button>'; return; }
   if (d.reset === 'yes') {
-    state = newState(); player.x = state.px; player.y = state.py; player.dir = 0; rainI = 0; closeModal(); return;
+    state = newState(); player.x = state.px; player.y = state.py; player.dir = 0; player.sit = false; rainI = 0; rebuildDyn(); closeModal(); return;
   }
   save(); refreshModal();
 });
-const img = (k, cls = '') => `<img class="${cls}" src="${ICON_URL[k]}" alt="">`;
+const img = k => `<img src="${ICON_URL[k]}" alt="">`;
 
+function shopRow(k, big = 5) {
+  const it = ITEMS[k];
+  return `<div class="row">${img(k)}<div class="nm">${it.name}<small>${it.note} · в мешочке: ${state.bag[k]}</small></div>
+    <div class="pr">${img('coin')}${it.buy}</div>
+    <div class="btns"><button class="px" data-buy="${k}" data-n="1" ${state.coins < it.buy ? 'disabled' : ''}>Купить</button>
+    <button class="px" data-buy="${k}" data-n="${big}" ${state.coins < it.buy * big ? 'disabled' : ''}>×${big}</button></div></div>`;
+}
 function openShop() {
   const h = hourOf();
-  const say = state.rain.on ? 'Ох и льёт! Зато грядки поливать не надо.' : h >= 20 || h < 6 ? 'Поздновато, но для тебя лавка открыта.' : ['Свежие семена прямо с большой земли!', 'Грядки крепкие, дубовые — на века.', 'Морковка нынче в цене, бери семена!'][dayNum() % 3];
-  openModal(() => `<h2>Торговец на пирсе</h2><div class="say">«${say}»</div>
-    ${['seedWheat', 'seedCarrot', 'bed'].map(k => {
-      const it = ITEMS[k];
-      return `<div class="row">${img(k)}<div class="nm">${it.name}<small>${it.note} · в мешочке: ${state.bag[k]}</small></div>
-      <div class="pr">${img('coin')}${it.buy}</div>
-      <div class="btns"><button class="px" data-buy="${k}" data-n="1" ${state.coins < it.buy ? 'disabled' : ''}>Купить</button>
-      <button class="px" data-buy="${k}" data-n="5" ${state.coins < it.buy * 5 ? 'disabled' : ''}>×5</button></div></div>`;
-    }).join('')}
-    <div class="foot">У тебя ${state.coins} монет. Урожай продаётся через сундук у домика.</div>`);
+  const say = state.rain.on ? 'Ох и льёт! Зато грядки поливать не надо.' : h >= 20 || h < 6 ? 'Поздновато, но для тебя лавка открыта.' : ['Свежие семена прямо с большой земли!', 'Курочки у меня несушки что надо!', 'Свёкла нынче в цене, бери семена!', 'Без заборчика куры разбегутся по всему острову.'][dayNum() % 4];
+  openModal(() => {
+    const free = freeCoopPlaces(), cost = ITEMS.chicken.buy;
+    const chickNote = state.objs.some(o => o.type === 'coop') ? `мест в домиках: ${free}` : 'сначала поставь куриный домик';
+    return `<h2>Торговец на пирсе</h2><div class="say">«${say}»</div>
+    <h3>СЕМЕНА</h3>${SEEDS.map(k => shopRow(k)).join('')}
+    <h3>ХОЗЯЙСТВО</h3>${shopRow('bed')}${shopRow('coop', 2)}${shopRow('feeder', 2)}${shopRow('fence', 10)}${shopRow('gate', 2)}
+    <h3>ЖИВОТНЫЕ</h3><div class="row">${img('chicken')}<div class="nm">Курица<small>ест пшеницу из кормушки и несёт яйца · ${chickNote} · у тебя: ${state.chickens.length}</small></div>
+      <div class="pr">${img('coin')}${cost}</div>
+      <div class="btns"><button class="px" data-chicken="1" ${!free || state.coins < cost ? 'disabled' : ''}>Купить</button></div></div>
+    <div class="foot">У тебя ${state.coins} монет. Урожай и яйца продаются через сундук у домика.</div>`;
+  });
 }
 function openChest() {
   openModal(() => {
-    const sum = state.chest.wheat * ITEMS.wheat.sell + state.chest.carrot * ITEMS.carrot.sell;
-    return `<h2>Сундук для продажи</h2><div class="say">Положи урожай — утром в 6:00 скупщик заберёт его и оставит монеты.</div>
-    ${['wheat', 'carrot'].map(k => `<div class="row">${img(k)}<div class="nm">${ITEMS[k].name}<small>в мешочке: ${state.bag[k]} · в сундуке: ${state.chest[k]}</small></div>
+    const sum = PRODUCE.reduce((s, k) => s + state.chest[k] * ITEMS[k].sell, 0);
+    return `<h2>Сундук для продажи</h2><div class="say">Положи товар — утром в 6:00 скупщик заберёт его и оставит монеты.</div>
+    ${PRODUCE.map(k => `<div class="row">${img(k)}<div class="nm">${ITEMS[k].name}<small>в мешочке: ${state.bag[k]} · в сундуке: ${state.chest[k]}</small></div>
       <div class="pr">${img('coin')}${ITEMS[k].sell}</div>
       <div class="btns"><button class="px" data-put="${k}" data-n="1" ${state.bag[k] ? '' : 'disabled'}>+1</button>
       <button class="px" data-put="${k}" data-n="all" ${state.bag[k] ? '' : 'disabled'}>Всё</button>
       <button class="px alt" data-take="${k}" ${state.chest[k] ? '' : 'disabled'}>Забрать</button></div></div>`).join('')}
-    <div class="foot">Утром получишь: ${sum} монет</div>`;
+    <div class="foot">Утром получишь: ${sum} монет. Пшеницу стоит оставить и для кормушки.</div>`;
   });
 }
 function openBag() {
-  if (sleeping) return;
+  if (busy) return;
+  const cell = (k, btn) => `<div class="cell ${btn && btn.on ? 'inhand' : ''}">${img(k)}<b>×${state.bag[k]}</b>${ITEMS[k].name}
+    ${btn ? `<br><button class="px ${btn.on ? 'alt' : ''}" data-${btn.attr}="${k}">${btn.on ? 'В руке' : 'Взять'}</button>` : ''}</div>`;
   openModal(() => `<h2>Мешочек</h2>
-    <div class="grid">${['seedWheat', 'seedCarrot', 'bed', 'wheat', 'carrot'].map(k => {
-      const seed = k in SEED_CROP, inHand = seed && state.seedType === k;
-      return `<div class="cell ${inHand ? 'inhand' : ''}">${img(k)}<b>×${state.bag[k]}</b>${ITEMS[k].name}
-        ${seed ? `<br><button class="px ${inHand ? 'alt' : ''}" data-hand="${k}">${inHand ? 'В руке' : 'Взять'}</button>` : ''}</div>`;
-    }).join('')}</div>
-    <div class="foot">Грядки ставятся молотком (1), сносятся кувалдой (2) — и возвращаются сюда.<br>Лейка (3): ${state.water}/${CAN_MAX}. Набрать воду — у берега или в колодце.</div>
+    <h3>СЕМЕНА</h3><div class="grid">${SEEDS.map(k => cell(k, { attr: 'hand', on: state.seedType === k })).join('')}</div>
+    <h3>УРОЖАЙ</h3><div class="grid">${PRODUCE.map(k => cell(k)).join('')}</div>
+    <h3>ПОСТРОЙКИ</h3><div class="grid">${BUILDS.map(k => cell(k, { attr: 'build', on: state.buildType === k })).join('')}</div>
+    <div class="foot">Постройки ставятся молотком (1), сносятся кувалдой (2) и возвращаются сюда.<br>
+    Лейка (3): ${state.water}/${CAN_MAX}. Куриц: ${state.chickens.length}.</div>
     <div style="text-align:right;margin-top:10px"><button class="px red" data-reset="ask">Начать заново</button></div>`);
 }
 

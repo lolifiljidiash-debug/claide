@@ -106,10 +106,10 @@ body.touch #help{display:none}
 'use strict';
 const $ = id => document.getElementById(id);
 // ================= константы мира =================
-const TS = 16, W = 48, H = 36, CX = 24, CY = 18, RX = 16, RY = 12;
+const TS = 16, W = 82, H = 54, CX = 24, CY = 18;
 const IW = 11, IH = 9; // комната в домике, в тайлах
 const DAY = 1440, WET_MAX = 720, CAN_MAX = 10, FEED_CAP = 6, COOP_CAP = 4, EGG_CAP = 4, GROW_SPRUCE = 1440;
-const MILL_NEED = { wood: 40, coins: 250 };
+const MILL_NEED = { wood: 30, cement: 10, coins: 250 };
 const ITEMS = {
   seedWheat: { name: 'Семена пшеницы', buy: 5, note: 'растёт ~2 мин, если полита' },
   seedCarrot: { name: 'Семена моркови', buy: 10, note: 'растёт ~3 мин' },
@@ -125,6 +125,7 @@ const ITEMS = {
   sapling: { name: 'Саженец ёлки', acc: 'саженец ёлки', buy: 10, note: 'за сутки вырастает в ёлку' },
   millPlan: { name: 'Чертёж мельницы', acc: 'стройку мельницы', buy: 150, note: 'разметь место 3×3 молотком' },
   axe: { name: 'Топор', buy: 50, note: 'рубит взрослые ёлки, даёт древесину' },
+  cement: { name: 'Пакет стройсмеси', buy: 25, note: 'для мельницы и каменных мостов' },
   chicken: { name: 'Курица', buy: 60 },
   wood: { name: 'Древесина', sell: 5 },
   wheat: { name: 'Пшеница', sell: 12 },
@@ -168,11 +169,57 @@ function vnoise(x, y) {
 function mulberry32(a) {
   return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
-function shoreR(a) { return 1 + 0.07 * Math.sin(3 * a + 0.6) + 0.05 * Math.sin(5 * a + 2.1) + 0.03 * Math.sin(8 * a + 4.0); }
+// острова: наш, лесной с озером и коровий
+const ISL = [
+  { cx: 24, cy: 18, rx: 16, ry: 12, ph: [0.6, 2.1, 4.0], am: [0.07, 0.05, 0.03] },
+  { cx: 63, cy: 19, rx: 15, ry: 11.5, ph: [1.7, 0.4, 2.9], am: [0.08, 0.05, 0.03], lake: { x: 66, y: 21.5, rx: 3.4, ry: 2.3 } },
+  { cx: 16, cy: 44, rx: 10, ry: 6.5, ph: [2.5, 1.1, 0.3], am: [0.06, 0.06, 0.03] },
+];
+function islandV(I, x, y) {
+  const dx = (x - I.cx) / I.rx, dy = (y - I.cy) / I.ry, a = Math.atan2(dy, dx);
+  const r = 1 + I.am[0] * Math.sin(3 * a + I.ph[0]) + I.am[1] * Math.sin(5 * a + I.ph[1]) + I.am[2] * Math.sin(8 * a + I.ph[2]);
+  let v = (r - Math.hypot(dx, dy)) * 14;
+  if (I.lake) v = Math.min(v, (Math.hypot((x - I.lake.x) / I.lake.rx, (y - I.lake.y) / I.lake.ry) - 1) * 8);
+  return v;
+}
+const islV = (i, x, y) => islandV(ISL[i], x, y);
 // сколько примерно тайлов до берега (плюс — суша, минус — вода)
 function landV(x, y) {
-  const dx = (x - CX) / RX, dy = (y - CY) / RY;
-  return (shoreR(Math.atan2(dy, dx)) - Math.hypot(dx, dy)) * 14;
+  let best = -20;
+  for (const I of ISL) if (Math.abs(x - I.cx) < I.rx * 1.6 && Math.abs(y - I.cy) < I.ry * 1.6) best = Math.max(best, islandV(I, x, y));
+  return best;
+}
+
+// ================= мосты =================
+// идём от центра острова, пока обе полосы будущего моста — суша
+function shoreScan(i, x, y, dx, dy, lanes) {
+  while (lanes.every(([ox, oy]) => islV(i, x + ox + 0.5, y + oy + 0.5) > 0.6)) { x += dx; y += dy; }
+  return [x - dx, y - dy];
+}
+const BRIDGES = [];
+{
+  const [a] = shoreScan(0, 24, 18, 1, 0, [[0, 0], [0, 1]]), [b] = shoreScan(1, 63, 18, -1, 0, [[0, 0], [0, 1]]);
+  BRIDGES.push({ id: 'forest', name: 'Лесной остров', dir: 'h', a, b, line: 18, sign: { tx: a - 1, ty: 17 }, worker: { tx: a - 1, ty: 20 },
+    costs: [{ wood: 25 }, { coins: 300 }, { coins: 500, cement: 5 }], style3: 'stone' });
+  const [, c] = shoreScan(0, 16, 18, 0, 1, [[0, 0], [1, 0]]), [, d] = shoreScan(2, 16, 44, 0, -1, [[0, 0], [1, 0]]);
+  BRIDGES.push({ id: 'cows', name: 'Коровий остров', dir: 'v', a: c, b: d, line: 16, sign: { tx: 15, ty: c - 1 }, worker: { tx: 18, ty: c - 1 },
+    costs: [{ wood: 35 }, { coins: 400 }, { coins: 600, cement: 5 }], style3: 'vines' });
+}
+function bridgeRect(B, lvl) {
+  const w = lvl >= 2 ? 32 : 16, u0 = B.a * TS + 4, u1 = (B.b + 1) * TS - 4, v0 = B.line * TS;
+  return B.dir === 'h' ? { x: u0, y: v0, w: u1 - u0, h: w } : { x: v0, y: u0, w, h: u1 - u0 };
+}
+function inCorridor(B, tx, ty) {
+  const along = B.dir === 'h' ? tx : ty, across = B.dir === 'h' ? ty : tx;
+  return along >= B.a - 1 && along <= B.b + 1 && across >= B.line && across <= B.line + 1;
+}
+const bridgeTile = (tx, ty) => BRIDGES.some(B => inCorridor(B, tx, ty) || (tx === B.sign.tx && ty === B.sign.ty) || (tx === B.worker.tx && ty === B.worker.ty));
+// у концов мостов не растёт декор
+function nearBridge(tx, ty) {
+  return bridgeTile(tx, ty) || BRIDGES.some(B => {
+    const along = B.dir === 'h' ? tx : ty, across = B.dir === 'h' ? ty : tx;
+    return across >= B.line - 2 && across <= B.line + 3 && ((along >= B.a - 4 && along <= B.a + 1) || (along >= B.b - 1 && along <= B.b + 4));
+  });
 }
 
 // ================= раскладка острова =================
@@ -201,7 +248,16 @@ function pathDist(x, y) {
   return d;
 }
 function onPier(px, py) { return px >= PIER.x && px < PIER.x + PIER.w && py >= PIER.y && py < PIER.y + PIER.h; }
-function walkable(px, py) { return onPier(px, py) || landV(px / TS, py / TS) > 0.2; }
+function walkable(px, py) {
+  if (onPier(px, py) || landV(px / TS, py / TS) > 0.2) return true;
+  for (const B of BRIDGES) {
+    const L = state.bridges[B.id];
+    if (!L) continue;
+    const R = bridgeRect(B, L);
+    if (px >= R.x && px < R.x + R.w && py >= R.y && py < R.y + R.h) return true;
+  }
+  return false;
+}
 
 const colliders = [];
 const addCol = (x, y, w, h) => colliders.push({ x, y, w, h });
@@ -249,6 +305,13 @@ function pen(c, ox = 0, oy = 0) {
       for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) {
         const dx = x + 0.5 - cx, dy = y + 0.5 - cy;
         if (dx * dx + dy * dy <= r * r) g.fillRect(x + ox, y + oy, 1, 1);
+      }
+    },
+    ell(cx, cy, rx, ry, col) {
+      g.fillStyle = col;
+      for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) {
+        const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry;
+        if (dx * dx + dy * dy <= 1) g.fillRect(x + ox, y + oy, 1, 1);
       }
     },
   };
@@ -704,7 +767,7 @@ function makeFenceLamp(lit) {
   r(2, 0, 2, 1, '#2e2e34'); r(2, 7, 2, 1, '#3a3a40');
   return outline(c, '#1e1a22');
 }
-function makeMill() {
+function makeMill(withSails = true) {
   const c = canvas(50, 100), P = pen(c, 1, 1), r = P.r;
   for (let y = 34; y <= 92; y++) {
     const hw = Math.round(13 + 7 * (y - 34) / 58);
@@ -719,7 +782,7 @@ function makeMill() {
   for (let y = 18; y <= 36; y++) { const hw = Math.round((y - 18) / 18 * 17) + 1; r(24 - hw, y, hw * 2, 1, '#9e3a2c'); r(24 - hw, y, Math.max(1, hw - 4), 1, '#c44d3a'); }
   r(6, 36, 36, 2, '#7d2e22');
   const hx = 24, hy = 30, k = Math.SQRT1_2;
-  for (const [dx, dy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) for (let t = 5; t <= 27; t++) for (let w = 0; w <= 4; w++) {
+  if (withSails) for (const [dx, dy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) for (let t = 5; t <= 27; t++) for (let w = 0; w <= 4; w++) {
     const x = Math.round(hx + t * dx * k - (w - 2) * dy * k), y = Math.round(hy + t * dy * k + (w - 2) * dx * k);
     P.p(x, y, w === 0 || w === 4 || t % 5 === 0 ? '#6e4527' : '#e9dcc0');
   }
@@ -737,6 +800,141 @@ function makeSite() {
   r(14, 40, 3, 10, '#6e4527'); r(7, 30, 18, 11, '#cf9a5e'); r(7, 30, 18, 1, '#e0b07a');
   r(9, 32, 14, 7, '#3d6fb0'); r(12, 34, 1, 4, '#e8f0ff'); r(11, 33, 3, 1, '#e8f0ff'); r(16, 33, 5, 1, '#e8f0ff'); r(16, 35, 4, 1, '#e8f0ff'); r(16, 37, 5, 1, '#e8f0ff');
   return outline(c, '#3a2418');
+}
+
+// ---- новые острова ----
+function makeCow(frame) { // смотрит вправо; frame 0 стоит, 1 шаг, 2 щиплет траву
+  const c = canvas(22, 16), P = pen(c, 1, 1), r = P.r, p = P.p, Wc = '#f4f0e8', S = '#d9d2c2', K = '#2b2b30';
+  const legs = frame === 1 ? [[4, 1], [7, 0], [11, 1], [14, 0]] : [[4, 0], [7, 0], [11, 0], [14, 0]];
+  for (const [x, up] of legs) { r(x, 10, 2, 4 - up, S); r(x, 13 - up, 2, 1, '#4a3a30'); }
+  r(2, 3, 1, 5, S); p(1, 8, K);
+  r(3, 3, 13, 7, Wc); r(3, 9, 13, 1, S); r(4, 2, 11, 1, Wc);
+  r(5, 4, 4, 3, K); r(11, 6, 3, 3, K); p(13, 3, K); p(6, 8, K);
+  p(9, 10, '#f2a0a8'); p(10, 10, '#f2a0a8');
+  const hy = frame === 2 ? 5 : 1;
+  r(15, hy, 4, 5, Wc); r(17, hy + 3, 3, 3, '#f2b0b0'); p(18, hy + 4, '#a86070');
+  p(16, hy + 1, '#2b1d2e'); p(15, hy - 1, '#e8d6b0'); p(18, hy - 1, '#e8d6b0'); p(14, hy, K);
+  return outline(c, '#3a2a22');
+}
+function makeSign() {
+  const c = canvas(18, 22), P = pen(c, 1, 1), r = P.r;
+  r(7, 8, 2, 12, '#6e4527');
+  r(1, 1, 14, 9, '#cf9a5e'); r(1, 1, 14, 1, '#e0b07a'); r(1, 9, 14, 1, '#8a5a30');
+  r(3, 3, 10, 1, '#6e4527'); r(3, 5, 8, 1, '#6e4527'); r(3, 7, 9, 1, '#6e4527');
+  return outline(c, '#3a2418');
+}
+function makeBridgeLamp(lit) {
+  const c = canvas(8, 14), P = pen(c, 1, 1), r = P.r;
+  r(1, 6, 4, 6, '#8d939b'); r(1, 6, 1, 6, '#b4b9bf'); r(0, 5, 6, 1, '#b4b9bf');
+  r(1, 1, 4, 4, '#3a3a40'); r(2, 2, 2, 2, lit ? '#c9a060' : '#cfe3e8'); r(1, 0, 4, 1, '#2e2e34');
+  return outline(c, '#2a2a30');
+}
+function makeShip(big) {
+  if (big) {
+    const c = canvas(30, 24), P = pen(c, 1, 1), r = P.r;
+    r(9, 0, 3, 2, '#c84b3a'); r(10, 2, 1, 13, '#4a3528'); r(18, 4, 1, 11, '#4a3528');
+    r(4, 3, 12, 10, '#f4ead0'); r(4, 12, 12, 1, '#d9cfb8'); r(14, 3, 2, 10, '#d9cfb8');
+    r(15, 5, 9, 9, '#efe6d2'); r(22, 5, 2, 9, '#d9cfb8');
+    r(1, 15, 26, 3, '#8a5a30'); r(1, 15, 26, 1, '#b07a45'); r(3, 18, 22, 2, '#6e4527'); r(5, 20, 18, 1, '#5e3b1e'); r(0, 14, 3, 2, '#8a5a30');
+    for (let x = 6; x < 24; x += 5) P.p(x, 16, '#3a2418');
+    return outline(c, '#2a1a14');
+  }
+  const c = canvas(14, 12), P = pen(c, 1, 1), r = P.r;
+  r(5, 0, 1, 7, '#4a3528'); r(2, 1, 6, 5, '#f4ead0'); r(6, 2, 3, 4, '#efe6d2'); r(1, 7, 11, 2, '#8a5a30'); r(2, 9, 9, 1, '#6e4527');
+  return outline(c, '#2a1a14');
+}
+// ---- мельница внутри ----
+function makeMillstone() {
+  const c = canvas(42, 32), P = pen(c, 1, 1);
+  P.ell(20, 22, 19, 7.5, '#6c7078'); P.ell(20, 20, 19, 7.5, '#9aa1a8'); P.ell(20, 15, 14, 6, '#7b8189'); P.ell(20, 13, 14, 6, '#b4b9bf');
+  for (const [x, y] of [[10, 13], [26, 11], [15, 16], [28, 15]]) P.r(x, y, 4, 1, '#9aa1a8');
+  P.ell(20, 13, 3, 1.6, '#4a4e54');
+  P.r(16, 0, 8, 7, '#8a5a30'); P.r(16, 0, 8, 1, '#b07a45'); P.r(17, 7, 6, 3, '#6e4527'); P.r(18, 2, 4, 3, '#f2cc4c');
+  return outline(c, '#2a2a30');
+}
+function makeBarrel() {
+  const c = canvas(14, 16), P = pen(c, 1, 1), r = P.r;
+  r(0, 1, 12, 13, '#8a5a30'); r(1, 0, 10, 2, '#a8713f'); r(3, 1, 6, 1, '#6e4527');
+  r(0, 3, 12, 1, '#5d6168'); r(0, 11, 12, 1, '#5d6168'); r(4, 2, 1, 12, '#7a4f2c'); r(8, 2, 1, 12, '#7a4f2c'); r(1, 2, 1, 11, '#a8713f');
+  return outline(c, '#2e1c14');
+}
+function makeBench() {
+  const c = canvas(40, 14), P = pen(c, 1, 1), r = P.r;
+  r(2, 6, 3, 6, '#5e3b1e'); r(33, 6, 3, 6, '#5e3b1e');
+  r(0, 2, 38, 4, '#a8713f'); r(0, 2, 38, 1, '#cf9a5e'); r(0, 5, 38, 1, '#7a4f2c');
+  return outline(c, '#2e1c14');
+}
+function makeShaft() {
+  const c = canvas(14, 72), P = pen(c, 1, 1), r = P.r;
+  r(3, 0, 6, 68, '#8a5a30'); r(3, 0, 1, 68, '#b07a45'); r(8, 0, 1, 68, '#6e4527');
+  P.circ(6, 30, 6.5, '#6e4527'); P.circ(6, 30, 4, '#8a5a30'); P.circ(6, 30, 1.5, '#4a2e1b');
+  for (const [x, y] of [[6, 22], [6, 38], [-2, 30], [14, 30], [0, 24], [12, 24], [0, 36], [12, 36]]) r(x - 1, y - 1, 2, 2, '#5e3b1e');
+  r(0, 64, 12, 6, '#5e3b1e'); r(0, 64, 12, 1, '#7a4f2c');
+  return outline(c, '#2e1c14');
+}
+function makeMillFloor1() {
+  const w = 144, h = 128, c = canvas(w, h), P = pen(c);
+  P.r(0, 0, w, h, '#1e1612');
+  for (let y = 40, k = 0; y < 124; y += 6, k++) {
+    P.r(4, y, w - 8, 5, k % 2 ? '#a8794a' : '#b58552'); P.r(4, y + 5, w - 8, 1, '#6e4527');
+    for (let x = 4 + (k * 19) % 31; x < w - 4; x += 31) P.r(x, y, 1, 5, '#7a5230');
+  }
+  P.r(4, 4, w - 8, 36, '#8d939b');
+  for (let y = 4, k = 0; y < 40; y += 6, k++) { P.r(4, y, w - 8, 1, '#6c7078'); for (let x = 4 + (k % 2) * 6; x < w - 4; x += 12) P.r(x, y, 1, 6, '#6c7078'); }
+  P.r(4, 38, w - 8, 2, '#5d6168');
+  P.g.fillStyle = 'rgba(30,15,10,.35)'; P.g.fillRect(4, 40, w - 8, 3);
+  P.r(0, 0, w, 4, '#2a1f1a'); P.r(0, 0, 4, h, '#2a1f1a'); P.r(w - 4, 0, 4, h, '#2a1f1a'); P.r(0, h - 4, w, 4, '#2a1f1a');
+  P.r(64, h - 4, 16, 4, '#7a4f2c'); P.r(64, h - 4, 16, 1, '#a8713f');
+  P.r(64, 8, 16, 24, '#5d6168');
+  // полка для муки
+  P.r(10, 8, 48, 30, '#6e4527'); P.r(12, 10, 44, 26, '#3a2418');
+  for (const y of [19, 29, 36]) { P.r(10, y, 48, 2, '#a8713f'); P.r(10, y, 48, 1, '#cf9a5e'); }
+  const sack = (x, y) => { P.r(x, y, 8, 8, '#efe6d2'); P.r(x + 1, y - 1, 6, 1, '#efe6d2'); P.r(x + 2, y - 2, 4, 1, '#d9ccb0'); P.r(x + 6, y, 2, 8, '#d9ccb0'); P.p(x + 3, y + 3, '#c9a06a'); P.p(x + 4, y + 4, '#c9a06a'); };
+  sack(14, 11); sack(25, 11); sack(42, 21);
+  for (const x of [14, 22, 30]) { P.r(x, 31, 5, 5, '#c4653a'); P.r(x, 31, 5, 1, '#d9774a'); }
+  // лестница на второй этаж
+  P.r(114, 0, 20, 4, '#0e0a08');
+  P.r(118, 0, 2, 70, '#8a5a30'); P.r(128, 0, 2, 70, '#8a5a30');
+  for (let y = 4; y < 70; y += 6) { P.r(118, y, 12, 2, '#a8713f'); P.r(118, y, 12, 1, '#cf9a5e'); }
+  // фонарь на стене
+  P.r(96, 14, 8, 10, '#3a3a40'); P.r(97, 15, 6, 8, '#ffd66b'); P.r(99, 24, 2, 3, '#3a3a40');
+  P.r(60, 112, 24, 10, '#8a6a3a'); for (let x = 62; x < 82; x += 3) P.r(x, 113, 1, 8, '#a8844a');
+  return c;
+}
+function makeMillFloor2() {
+  const w = 144, h = 112, c = canvas(w, h), P = pen(c);
+  P.r(0, 0, w, h, '#1e1612');
+  for (let y = 44, k = 0; y < 108; y += 6, k++) {
+    P.r(4, y, w - 8, 5, k % 2 ? '#b58552' : '#c39060'); P.r(4, y + 5, w - 8, 1, '#7a4f2c');
+    for (let x = 4 + (k * 23) % 29; x < w - 4; x += 29) P.r(x, y, 1, 5, '#8a5a30');
+  }
+  P.r(4, 4, w - 8, 40, '#8a5a30');
+  for (let x = 4; x < w - 4; x += 8) { P.r(x, 4, 1, 40, '#6e4527'); P.r(x + 1, 4, 1, 40, '#9c6b3f'); }
+  P.r(4, 42, w - 8, 2, '#5e3b1e');
+  P.g.fillStyle = 'rgba(30,15,10,.35)'; P.g.fillRect(4, 44, w - 8, 3);
+  for (const wx of [12, 80]) { P.r(wx - 2, 6, 56, 36, '#5e3b1e'); P.r(wx - 3, 40, 58, 3, '#7a4f2c'); P.r(wx - 3, 40, 58, 1, '#a8713f'); }
+  P.r(0, 0, w, 4, '#2a1f1a'); P.r(0, 0, 4, h, '#2a1f1a'); P.r(w - 4, 0, 4, h, '#2a1f1a'); P.r(0, h - 4, w, 4, '#2a1f1a');
+  // проём с лестницей вниз
+  P.r(106, 78, 30, 28, '#5e3b1e'); P.r(108, 80, 26, 24, '#0e0a08');
+  P.r(114, 80, 2, 24, '#8a5a30'); P.r(124, 80, 2, 24, '#8a5a30');
+  for (let y = 84; y < 104; y += 6) P.r(114, y, 12, 2, '#6e4527');
+  return c;
+}
+function skyPair(LT) {
+  const night = LT.dark > 0.4;
+  if (state.rain.on) return night ? ['#11141f', '#262c3a'] : ['#7d8796', '#a9b3bf'];
+  if (night) return ['#0b1030', '#2a2f60'];
+  if (LT.tintA > 0.15) return hourOf() < 12 ? ['#6a7fc0', '#f7b28a'] : ['#5a4a8a', '#f2a070'];
+  return ['#4f9fe0', '#bfe6f5'];
+}
+function seaPair(LT) {
+  if (state.rain.on) return ['#5d7488', '#3e5568'];
+  if (LT.dark > 0.4) return ['#1d2f5a', '#0e1a38'];
+  return LT.tintA > 0.15 ? ['#6a87b8', '#2f5f95'] : ['#4fa3d6', '#2e72a8'];
+}
+function lerpHex(a, b, t) {
+  const A = hexRGB(a), B = hexRGB(b);
+  return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',')})`;
 }
 
 // ---- иконки 16×16 ----
@@ -802,6 +1000,10 @@ const ICON = {
   }),
   sun: icon(P => { P.circ(8, 8, 4, '#f7c948'); P.r(7, 1, 2, 2, '#f7c948'); P.r(7, 13, 2, 2, '#f7c948'); P.r(1, 7, 2, 2, '#f7c948'); P.r(13, 7, 2, 2, '#f7c948'); P.p(3, 3, '#f7c948'); P.p(12, 3, '#f7c948'); P.p(3, 12, '#f7c948'); P.p(12, 12, '#f7c948'); P.r(6, 6, 2, 2, '#fff2b0'); }, '#a8652a'),
   moon: icon(P => { P.circ(8, 8, 5.5, '#f4e9b0'); P.g.globalCompositeOperation = 'destination-out'; P.circ(10.5, 6, 4.5, '#000'); P.g.globalCompositeOperation = 'source-over'; P.p(5, 9, '#d8cc8e'); }, '#5a5070'),
+  cement: icon(P => {
+    P.r(3, 4, 10, 10, '#c1c6cb'); P.r(4, 3, 8, 1, '#c1c6cb'); P.r(3, 4, 10, 1, '#dfe2e5'); P.r(11, 5, 2, 9, '#9aa1a8');
+    P.r(6, 2, 4, 1, '#8d939b'); P.r(5, 7, 6, 4, '#3d6fb0'); P.r(6, 8, 4, 1, '#e8f0ff'); P.r(6, 10, 3, 1, '#e8f0ff');
+  }),
   axe: icon(P => { P.r(7, 4, 2, 11, '#8a5a30'); P.r(7, 4, 1, 11, '#b07a45'); P.r(3, 2, 5, 6, '#8d939b'); P.r(2, 2, 1, 6, '#dfe2e5'); P.r(3, 2, 5, 1, '#c3c8ce'); P.r(8, 3, 2, 3, '#62676e'); }),
   wood: icon(P => {
     P.r(3, 9, 11, 4, '#8a5a30'); P.r(3, 9, 11, 1, '#a8713f'); P.circ(3.5, 11, 2.3, '#e0b07a'); P.p(3, 11, '#a8713f');
@@ -839,8 +1041,16 @@ const SPR = {
   bigBed: makeBigBed(), table: makeTable(), chair: makeChair(), nightstand: makeNightstand(), plant: makePlant(),
   spruce: [0, 1, 2].map(makeSpruce),
   fenceLamp: makeFenceLamp(false), fenceLampLit: makeFenceLamp(true),
-  mill: makeMill(), site: makeSite(),
+  mill: makeMill(), millTower: makeMill(false), site: makeSite(),
+  worker: personSet({ hat: '#f2cc4c', hatD: '#c9962f', hatL: '#fbe590', band: '#e0a020', hair: '#5a3a24', skin: '#e9b48c', skinD: '#c98d68', shirt: '#4a78b8', shirtD: '#355a8a', over: '#f08a2b', overD: '#c4651a', btn: '#ffffff', boot: '#4a3020', bootD: '#2e1d12' }),
+  cowR: [0, 1, 2].map(makeCow), sign: makeSign(),
+  bridgeLamp: makeBridgeLamp(false), bridgeLampLit: makeBridgeLamp(true),
+  shipBig: makeShip(true), shipSmall: makeShip(false),
+  millstone: makeMillstone(), barrel: makeBarrel(), bench: makeBench(), shaft: makeShaft(),
 };
+SPR.cowL = SPR.cowR.map(mirror);
+SPR.shipBigL = mirror(SPR.shipBig); SPR.shipSmallL = mirror(SPR.shipSmall);
+const MILL1 = makeMillFloor1(), MILL2 = makeMillFloor2();
 SPR.chickenL = SPR.chickenR.map(set => set.map(mirror));
 const INTERIOR = makeInterior();
 ICON.chicken = (() => { const c = canvas(16, 16); c.getContext('2d').drawImage(SPR.chickenR[0][0], 1, 2); return c; })();
@@ -855,12 +1065,15 @@ for (const [tx, ty, apple] of [[9, 14, 0], [11, 22, 1], [35, 13, 0], [34, 23, 1]
   if (landV(tx + 0.5, ty + 0.5) < 2.5 || reserved(tx, ty)) continue;
   const x = tx * TS + 8, y = ty * TS + 14;
   trees.push({ x, y });
+  if (nearBridge(tx, ty)) continue; // место под мост; в списке остаётся, чтобы раскладка кустов не поменялась
   props.push({ x, y, spr: apple ? SPR.appleTree : SPR.tree, ox: 17, oy: 44, shadow: 11 });
   addCol(x - 5, y - 5, 10, 5);
 }
 {
   const rnd = mulberry32(42);
-  const near = (x, y, d) => trees.some(t => Math.hypot(t.x - x, t.y - y) < d) || props.some(p => Math.hypot(p.x - x, p.y - y) < d * 0.6);
+  const placed = props.slice();
+  const near = (x, y, d) => trees.some(t => Math.hypot(t.x - x, t.y - y) < d) || placed.some(p => Math.hypot(p.x - x, p.y - y) < d * 0.6);
+  const put = (tx, ty, p, col) => { placed.push(p); if (nearBridge(tx, ty)) return; props.push(p); if (col) addCol(...col); };
   let bushes = 0, rocks = 0;
   for (let i = 0; i < 600 && (bushes < 10 || rocks < 8); i++) {
     const tx = 6 + Math.floor(rnd() * 36), ty = 5 + Math.floor(rnd() * 26);
@@ -868,12 +1081,10 @@ for (const [tx, ty, apple] of [[9, 14, 0], [11, 22, 1], [35, 13, 0], [34, 23, 1]
     const v = landV(tx + 0.5, ty + 0.5), x = tx * TS + 8, y = ty * TS + 13;
     if (near(x, y, 34)) continue;
     if (bushes < 10 && v > 2.2) {
-      props.push({ x, y, spr: rnd() < 0.35 ? SPR.berryBush : SPR.bush, ox: 9, oy: 14, shadow: 7 });
-      addCol(x - 5, y - 4, 10, 4); bushes++;
+      put(tx, ty, { x, y, spr: rnd() < 0.35 ? SPR.berryBush : SPR.bush, ox: 9, oy: 14, shadow: 7 }, [x - 5, y - 4, 10, 4]); bushes++;
     } else if (rocks < 8 && v > 0.5) {
       const big = rnd() < 0.5;
-      props.push({ x, y, spr: big ? SPR.rock : SPR.pebble, ox: 8, oy: 11, shadow: big ? 6 : 4 });
-      if (big) addCol(x - 5, y - 4, 10, 4); rocks++;
+      put(tx, ty, { x, y, spr: big ? SPR.rock : SPR.pebble, ox: 8, oy: 11, shadow: big ? 6 : 4 }, big && [x - 5, y - 4, 10, 4]); rocks++;
     }
   }
 }
@@ -883,14 +1094,40 @@ const WILD = [];
   const rnd = mulberry32(77);
   for (let i = 0; i < 800 && WILD.length < 8; i++) {
     const tx = 8 + Math.floor(rnd() * 32), ty = 7 + Math.floor(rnd() * 22);
-    if (reserved(tx, ty)) continue;
-    if ([[0.05, 0.05], [0.95, 0.05], [0.05, 0.95], [0.95, 0.95]].some(([ox, oy]) => landV(tx + ox, ty + oy) < 2.2)) continue;
+    if (reserved(tx, ty) || nearBridge(tx, ty)) continue;
+    if ([[0.05, 0.05], [0.95, 0.05], [0.05, 0.95], [0.95, 0.95]].some(([ox, oy]) => islV(0, tx + ox, ty + oy) < 2.2)) continue;
     const x = tx * TS + 8, y = ty * TS + 14;
     if (props.some(p => Math.hypot(p.x - x, p.y - y) < 30)) continue;
     if (WILD.some(([wx, wy]) => Math.hypot(wx - tx, wy - ty) < 2.5)) continue;
     WILD.push([tx, ty]);
   }
 }
+// Лесной остров: ёлки, кусты и камни
+const FOREST_WILD = [];
+{
+  const rnd = mulberry32(101), I = ISL[1];
+  const corners = (tx, ty) => [[0.05, 0.05], [0.95, 0.05], [0.05, 0.95], [0.95, 0.95]].map(([ox, oy]) => islV(1, tx + ox, ty + oy));
+  for (let i = 0; i < 3000 && FOREST_WILD.length < 26; i++) {
+    const tx = Math.floor(I.cx - I.rx + rnd() * I.rx * 2), ty = Math.floor(I.cy - I.ry + rnd() * I.ry * 2);
+    if (nearBridge(tx, ty) || corners(tx, ty).some(v => v < 2)) continue;
+    if (FOREST_WILD.some(([x, y]) => Math.hypot(x - tx, y - ty) < 2.2)) continue;
+    FOREST_WILD.push([tx, ty]);
+  }
+  const rnd2 = mulberry32(202);
+  for (let i = 0, n = 0; i < 800 && n < 12; i++) {
+    const tx = Math.floor(I.cx - I.rx + rnd2() * I.rx * 2), ty = Math.floor(I.cy - I.ry + rnd2() * I.ry * 2);
+    if (nearBridge(tx, ty) || islV(1, tx + 0.5, ty + 0.5) < 1.5 || FOREST_WILD.some(([x, y]) => Math.hypot(x - tx, y - ty) < 1.6)) continue;
+    const x = tx * TS + 8, y = ty * TS + 13;
+    if (props.some(p => Math.hypot(p.x - x, p.y - y) < 24)) continue;
+    if (n % 2) { props.push({ x, y, spr: rnd2() < 0.4 ? SPR.berryBush : SPR.bush, ox: 9, oy: 14, shadow: 7 }); addCol(x - 5, y - 4, 10, 4); }
+    else { props.push({ x, y, spr: SPR.rock, ox: 8, oy: 11, shadow: 6 }); addCol(x - 5, y - 4, 10, 4); }
+    n++;
+  }
+}
+// Коровий остров: одна яблоня
+{ const x = ISL[2].cx * TS + 8, y = ISL[2].cy * TS + 14; props.push({ x, y, spr: SPR.appleTree, ox: 17, oy: 44, shadow: 11 }); addCol(x - 5, y - 5, 10, 5); }
+// таблички у мостов
+for (const B of BRIDGES) { const x = B.sign.tx * TS + 8, y = B.sign.ty * TS + 14; props.push({ x, y, spr: SPR.sign, ox: 9, oy: 20, shadow: 4 }); addCol(x - 4, y - 3, 8, 4); }
 props.push({ x: HOUSE.x + 40, y: HOUSE.y + 80, spr: SPR.house, ox: 41, oy: 81 });
 props.push({ x: CHEST.tx * TS + 8, y: CHEST.ty * TS + 15, spr: SPR.chest, ox: 9, oy: 15, shadow: 8 });
 props.push({ x: WELL.tx * TS + 8, y: WELL.ty * TS + 15, spr: SPR.well, ox: 9, oy: 29, shadow: 8 });
@@ -955,7 +1192,7 @@ function buildGround() {
 
   const rnd = mulberry32(9);
   const FL = ['#ffffff', '#f7a6c4', '#f7d24a', '#a8c8ff', '#ff8a6a'];
-  for (let i = 0; i < 1400; i++) {
+  for (let i = 0; i < 3600; i++) {
     const px = Math.floor(rnd() * c.width), py = Math.floor(rnd() * c.height);
     const x = px / TS, y = py / TS;
     if (landV(x, y) < 2 || pathDist(x, y) < 0.9) continue;
@@ -990,9 +1227,9 @@ const SAVE_KEY = 'ostrov-ferma-v1';
 function newState() {
   return {
     v: 1, t: 6 * 60, paidIdx: 0, coins: 20,
-    bag: { seedWheat: 4, seedCarrot: 2, seedBeet: 0, seedPotato: 0, wheat: 0, carrot: 0, beet: 0, potato: 0, egg: 0, wood: 0, bed: 2, coop: 0, feeder: 0, fence: 0, gate: 0, lamp: 0, fenceLamp: 0, sapling: 0, millPlan: 0 },
+    bag: { seedWheat: 4, seedCarrot: 2, seedBeet: 0, seedPotato: 0, wheat: 0, carrot: 0, beet: 0, potato: 0, egg: 0, wood: 0, cement: 0, bed: 2, coop: 0, feeder: 0, fence: 0, gate: 0, lamp: 0, fenceLamp: 0, sapling: 0, millPlan: 0 },
     chest: { wheat: 0, carrot: 0, beet: 0, potato: 0, egg: 0, wood: 0 },
-    hasAxe: false, wild: true,
+    hasAxe: false, wild: true, wild2: true, bridges: { forest: 0, cows: 0 }, inMill: null,
     beds: [
       { tx: 22, ty: 13, crop: 'wheat', prog: 600, wet: 0 },
       { tx: 23, ty: 13, crop: 'wheat', prog: 600, wet: 0 },
@@ -1001,7 +1238,7 @@ function newState() {
       { tx: 23, ty: 14, crop: 'carrot', prog: 200, wet: 0 },
       { tx: 24, ty: 14, crop: null, prog: 0, wet: 0 },
     ],
-    objs: WILD.map(([tx, ty]) => ({ type: 'spruce', tx, ty, grow: GROW_SPRUCE })), chickens: [],
+    objs: WILD.concat(FOREST_WILD).map(([tx, ty]) => ({ type: 'spruce', tx, ty, grow: GROW_SPRUCE })), chickens: [],
     water: CAN_MAX, sel: 0, seedType: 'seedWheat', buildType: 'bed',
     rain: { on: false, left: 0 }, firstRain: false,
     scene: 'island', px: 17.5 * TS, py: 17.5 * TS, dir: 0,
@@ -1017,6 +1254,9 @@ function migrate(s) {
     for (const [tx, ty] of WILD) if (!s.objs.some(o => o.tx === tx && o.ty === ty) && !s.beds.some(b => b.tx === tx && b.ty === ty)) s.objs.push({ type: 'spruce', tx, ty, grow: GROW_SPRUCE });
     s.wild = true;
   }
+  if (!s.wild2) { for (const [tx, ty] of FOREST_WILD) s.objs.push({ type: 'spruce', tx, ty, grow: GROW_SPRUCE }); s.wild2 = true; }
+  s.bridges = Object.assign({ forest: 0, cows: 0 }, s.bridges);
+  if (s.scene.startsWith('mill') && !(s.inMill && s.objs.some(o => o.type === 'mill' && o.built))) { s.scene = 'island'; s.px = 17.5 * TS; s.py = 17.5 * TS; }
   return s;
 }
 function loadState() {
@@ -1078,6 +1318,7 @@ function rebuildDyn() {
       if (!o.open) dynCols.push(horiz ? { x, y: y + 9, w: 16, h: 5 } : { x: x + 5, y, w: 6, h: 16 });
     }
   }
+  for (const B of BRIDGES) if (state.bridges[B.id]) dynCols.push({ x: B.worker.tx * TS + 3, y: B.worker.ty * TS + 6, w: 10, h: 10 });
 }
 rebuildDyn();
 
@@ -1107,6 +1348,7 @@ const paused = () => modalOpen || busy;
 addEventListener('keydown', e => {
   if (e.code === 'Tab') e.preventDefault();
   if (modalOpen) { if (e.code === 'Escape' || e.code === 'KeyI' || e.code === 'Tab') closeModal(); return; }
+  if (pano && e.code === 'Escape' && !busy) { closePano(); return; }
   if (busy) return;
   keys[e.code] = true;
   if (e.repeat) return;
@@ -1151,7 +1393,7 @@ function canPlace(type, tx, ty) {
   const grassy = type === 'bed' || type === 'sapling', minV = grassy ? 1.3 : 0.4;
   for (const [ox, oy] of [[0.05, 0.05], [0.95, 0.05], [0.05, 0.95], [0.95, 0.95], [0.5, 0.5]]) if (landV(tx + ox, ty + oy) < minV) return false;
   if (grassy && pathDist(tx + 0.5, ty + 0.5) < 1.0) return false;
-  if (bedAt(tx, ty) || objAt(tx, ty) || onPier(tx * TS + 8, ty * TS + 8)) return false;
+  if (bedAt(tx, ty) || objAt(tx, ty) || onPier(tx * TS + 8, ty * TS + 8) || bridgeTile(tx, ty)) return false;
   const x = tx * TS, y = ty * TS;
   if (colliders.some(c => x < c.x + c.w && x + TS > c.x && y < c.y + c.h && y + TS > c.y)) return false;
   if (type !== 'bed') {
@@ -1167,12 +1409,20 @@ function chickenNear(tx, ty) {
   return state.chickens.find(c => !c.inside && Math.hypot(c.x - cx, c.y - cy) < 11);
 }
 
-function getAction() { return state.scene === 'house' ? houseAction() : islandAction(); }
+function getAction() {
+  if (pano) return { hint: 'Вернуться в мельницу', run: closePano };
+  const RM = ROOMS[state.scene];
+  return RM ? RM.action() : islandAction();
+}
 function islandAction() {
   const { tx, ty } = targetTile(), tool = TOOLS[state.sel].key;
   if (tx === TRADER.tx && ty === TRADER.ty) return { hint: 'Поговорить с торговцем', run: openShop };
   if (tx === CHEST.tx && ty === CHEST.ty) return { hint: 'Открыть сундук для продажи', run: openChest };
   if (tx === DOOR.tx && ty === DOOR.ty) return { hint: 'Войти в домик', run: enterHouse };
+  for (const B of BRIDGES) {
+    if (tx === B.sign.tx && ty === B.sign.ty) return { hint: `Табличка: ${B.name}`, run: () => openBridge(B) };
+    if (state.bridges[B.id] && tx === B.worker.tx && ty === B.worker.ty) return { hint: 'Поговорить с рабочим', run: () => openBridge(B) };
+  }
   if (tx === WELL.tx && ty === WELL.ty) return tool === 'can' ? { hint: 'Набрать воды из колодца', run: refill, anim: 1 } : { hint: 'Колодец — возьми лейку (3)' };
   const o = objAt(tx, ty);
   if (o) {
@@ -1183,6 +1433,7 @@ function islandAction() {
       if (tool === 'axe' && state.hasAxe) return { hint: `Рубить ёлку (${3 - (o.hits || 0)})`, run: () => chop(o), anim: 1 };
       return { hint: state.hasAxe ? 'Ёлка. Возьми топор (5), чтобы срубить' : 'Ёлка. Топор продаётся у торговца' };
     }
+    if (o.type === 'mill' && o.built) return tx === o.tx + 1 && ty === o.ty + 2 ? { hint: 'Войти в мельницу', run: () => enterMill(o) } : { hint: 'Мельница' };
     if (o.type === 'fence' && o.lamp && tool === 'sledge') return { hint: 'Снять лампу с забора', run: () => takeFenceLamp(o), anim: 1 };
     if (tool === 'sledge') return { hint: `Снести ${ITEMS[bagKeyOf(o)].acc} в мешочек`, run: () => removeObj(o), anim: 1 };
     if (o.type === 'fence' && tool === 'hammer' && state.buildType === 'fenceLamp') {
@@ -1457,6 +1708,251 @@ function warmUp() {
 }
 function sitDown() { player.sit = true; player.x = 15; player.y = 97; player.dir = 2; }
 
+// ---- мельница ----
+function buildMill() {
+  const o = state.objs.find(x => x.type === 'mill' && !x.built);
+  if (!o || state.bag.wood < MILL_NEED.wood || state.bag.cement < MILL_NEED.cement || state.coins < MILL_NEED.coins) return;
+  state.bag.wood -= MILL_NEED.wood; state.bag.cement -= MILL_NEED.cement; state.coins -= MILL_NEED.coins;
+  o.built = true;
+  for (let i = 0; i < 8; i++) burst(o.tx * TS + Math.random() * 48, o.ty * TS + Math.random() * 48, 5, ['#efe6d2', '#9aa1a8', '#cf9a5e'], { up: 60 });
+  toast('Мельница построена! Заходи внутрь через дверь');
+}
+function enterMill(o) {
+  fadeThen(() => { state.inMill = { tx: o.tx, ty: o.ty }; state.scene = 'mill1'; player.x = 72; player.y = 120; player.dir = 1; parts.length = 0; save(); });
+}
+function exitMill() {
+  const m = state.inMill || { tx: DOOR.tx - 1, ty: DOOR.ty - 2 };
+  fadeThen(() => { state.scene = 'island'; player.x = (m.tx + 1) * TS + 8; player.y = (m.ty + 3) * TS + 10; player.dir = 0; parts.length = 0; save(); });
+}
+function climbUp() { fadeThen(() => { state.scene = 'mill2'; player.x = 96; player.y = 96; player.dir = 3; parts.length = 0; }); }
+function climbDown() { fadeThen(() => { state.scene = 'mill1'; player.x = 112; player.y = 84; player.dir = 0; parts.length = 0; }); }
+function drawSails(hx, hy, ang) {
+  for (let k = 0; k < 4; k++) {
+    const a = ang + k * Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a);
+    for (let t = 5; t <= 27; t += 0.5) for (let w = 0; w <= 4; w += 0.5) {
+      ctx.fillStyle = w < 0.6 || w > 3.4 || t % 5 < 0.6 ? '#6e4527' : '#e9dcc0';
+      ctx.fillRect(Math.round(hx + t * ca - (w - 2) * sa) - camX, Math.round(hy + t * sa + (w - 2) * ca) - camY, 1, 1);
+    }
+  }
+  ctx.fillStyle = '#5e3b1e'; ctx.fillRect(hx - 2 - camX, hy - 2 - camY, 4, 4);
+}
+
+// ---- мосты ----
+const costParts = c => [c.wood && `${c.wood} древесины`, c.coins && `${c.coins} монет`, c.cement && `${c.cement} пакетов стройсмеси`].filter(Boolean).join(' + ');
+const hasCost = c => (!c.wood || state.bag.wood >= c.wood) && (!c.coins || state.coins >= c.coins) && (!c.cement || state.bag.cement >= c.cement);
+// постройки и грядки, попавшие на трассу моста, возвращаются в мешочек
+function clearCorridor(B) {
+  for (let i = state.objs.length - 1; i >= 0; i--) {
+    const o = state.objs[i];
+    let hit = false;
+    for (let y = 0; y < (o.h || 1); y++) for (let x = 0; x < (o.w || 1); x++) if (inCorridor(B, o.tx + x, o.ty + y)) hit = true;
+    if (hit && o.type !== 'mill') { state.bag[bagKeyOf(o)]++; state.objs.splice(i, 1); }
+  }
+  for (let i = state.beds.length - 1; i >= 0; i--) if (inCorridor(B, state.beds[i].tx, state.beds[i].ty)) { state.bag.bed++; state.beds.splice(i, 1); }
+}
+function upgradeBridge(id) {
+  const B = BRIDGES.find(b => b.id === id), L = state.bridges[id], c = B.costs[L];
+  if (!c || !hasCost(c)) return;
+  state.bag.wood -= c.wood || 0; state.coins -= c.coins || 0; state.bag.cement -= c.cement || 0;
+  state.bridges[id] = L + 1;
+  clearCorridor(B); rebuildDyn();
+  const R = bridgeRect(B, L + 1);
+  for (let i = 0; i < 12; i++) burst(R.x + Math.random() * R.w, R.y + Math.random() * R.h, 4, ['#cf9a5e', '#e3c9a0', '#9aa1a8'], { up: 50 });
+  toast(L === 0 ? `Мост готов — путь на ${B.name.toLowerCase()} открыт!` : L === 1 ? 'Рабочий расширил мост' : 'Мост стал как новый — красота!');
+}
+function bridgeTitles(B) { return ['Узкий мостик', 'Широкий мост из красивого дерева', B.style3 === 'stone' ? 'Каменный мост с фонарями' : 'Деревянный мост в лианах']; }
+function openBridge(B) {
+  openModal(() => {
+    const L = state.bridges[B.id], titles = bridgeTitles(B);
+    const say = L === 0 ? `Отсюда можно проложить путь на ${B.id === 'forest' ? 'большой лесной остров с озером' : 'остров с яблоней, где пасутся коровы'}. Остров твой, как только построишь узкий мостик из древесины.`
+      : L === 1 ? '«Здорово, хозяин! Я рабочий. За монеты расширю мост до двух клеток и сделаю его из красивого дерева.»'
+      : L === 2 ? `«Могу сделать ${titles[2].toLowerCase()}. Нужны монеты и пакеты стройсмеси — их продаёт торговец.»`
+      : '«Мост готов — лучше не бывает!»';
+    const rows = B.costs.map((c, i) => `<div class="row"><div class="nm">${i + 1}. ${titles[i]}<small>${costParts(c)}</small></div>
+      <div class="btns">${L > i ? '<span>готово ✓</span>' : L === i ? `<button class="px" data-bridge="${B.id}" ${hasCost(c) ? '' : 'disabled'}>Построить</button>` : '<span>позже</span>'}</div></div>`).join('');
+    return `<h2>${B.name}</h2><div class="say">${say}</div>${rows}
+      <div class="foot">У тебя: ${state.bag.wood} древесины · ${state.bag.cement} пакетов стройсмеси · ${state.coins} монет</div>`;
+  });
+}
+// фонари каменного моста
+function bridgeLamps() {
+  const out = [];
+  for (const B of BRIDGES) {
+    if (state.bridges[B.id] < 3 || B.style3 !== 'stone') continue;
+    const R = bridgeRect(B, 3), len = B.dir === 'h' ? R.w : R.h;
+    for (let u = 14; u < len - 8; u += 40) {
+      if (B.dir === 'h') out.push({ x: R.x + u, y: R.y + 2 }, { x: R.x + u, y: R.y + R.h - 1 });
+      else out.push({ x: R.x + 2, y: R.y + u }, { x: R.x + R.w - 2, y: R.y + u });
+    }
+  }
+  return out;
+}
+function drawBridges() {
+  for (const B of BRIDGES) {
+    const L = state.bridges[B.id], R = bridgeRect(B, Math.max(1, L));
+    const len = B.dir === 'h' ? R.w : R.h, wid = B.dir === 'h' ? R.h : R.w;
+    const f = (u, v, du, dv, col) => {
+      ctx.fillStyle = col;
+      if (B.dir === 'h') ctx.fillRect(R.x + u - camX, R.y + v - camY, du, dv); else ctx.fillRect(R.x + v - camX, R.y + u - camY, dv, du);
+    };
+    if (!L) { f(4, 1, 3, 3, '#6e4527'); f(4, wid - 4, 3, 3, '#6e4527'); f(len - 7, 1, 3, 3, '#6e4527'); f(len - 7, wid - 4, 3, 3, '#6e4527'); continue; }
+    ctx.fillStyle = 'rgba(20,50,90,.35)';
+    if (B.dir === 'h') ctx.fillRect(R.x - camX, R.y + R.h - camY, R.w, 3); else ctx.fillRect(R.x + R.w - camX, R.y - camY, 3, R.h);
+    if (L === 1) {
+      for (let u = 0; u < len; u += 4) { f(u, 1, 3, wid - 2, hash(u, 1) > 0.5 ? '#b07a45' : '#a8713f'); f(u, 1, 3, 1, '#cf9a5e'); }
+      f(0, 0, len, 1, '#d9c49a'); f(0, wid - 1, len, 1, '#d9c49a');
+      for (let u = 0; u < len; u += 32) { f(u, 0, 2, 2, '#5e3b1e'); f(u, wid - 2, 2, 2, '#5e3b1e'); }
+    } else if (L === 2 || B.style3 === 'vines') {
+      f(0, 0, len, wid, '#c58c55');
+      for (let u = 0; u < len; u += 6) { f(u, 3, 1, wid - 6, '#a8713f'); if (hash(u, 7) > 0.5) f(u + 2, 3 + Math.floor(hash(7, u) * (wid - 8)), 2, 1, '#dba56c'); }
+      f(0, 0, len, 3, '#7a4f2c'); f(0, wid - 3, len, 3, '#7a4f2c'); f(0, 0, len, 1, '#9c6b3f'); f(0, wid - 3, len, 1, '#9c6b3f');
+      for (let u = 4; u < len; u += 16) { f(u, 0, 3, 3, '#5e3b1e'); f(u, wid - 3, 3, 3, '#5e3b1e'); f(u, 0, 3, 1, '#a8713f'); f(u, wid - 3, 3, 1, '#a8713f'); }
+      if (L === 3) for (let u = 0; u < len; u++) {
+        const s = Math.sin(u * 0.45) > 0 ? 0 : 1, s2 = Math.sin(u * 0.45 + 2) > 0 ? 0 : 1;
+        f(u, s, 1, 2, '#2f6f2e'); f(u, wid - 2 + s2, 1, 2, '#2f6f2e');
+        if (hash(u, 3) > 0.55) f(u, 1 + s, 2, 2, hash(u, 4) > 0.5 ? '#5fb048' : '#3f8f3a');
+        if (hash(3, u) > 0.55) f(u, wid - 3 - s2, 2, 2, hash(4, u) > 0.5 ? '#5fb048' : '#3f8f3a');
+        if (hash(u, 5) > 0.85) f(u, 2 + s, 1, 1, '#84cc5a');
+        if (hash(u, 9) > 0.9) f(u, 2, 1, 1, '#f7a6c4');
+        if (hash(9, u) > 0.9) f(u, wid - 3, 1, 1, '#ffffff');
+        if (hash(u, 13) > 0.82) { const n = 2 + Math.floor(hash(13, u) * 5); f(u, wid, 1, n, '#2f6f2e'); f(u, wid + n - 1, 2, 1, '#5fb048'); }
+        if (hash(u, 17) > 0.97) for (let k = 0; k < wid; k += 2) f(u + (k >> 2), k, 1, 2, '#3f8f3a');
+      }
+    } else {
+      f(0, 0, len, wid, '#9aa1a8');
+      for (let v = 3, k = 0; v < wid - 3; v += 4, k++) { f(0, v, len, 1, '#7b8189'); for (let u = (k % 2) * 4; u < len; u += 8) f(u, v, 1, 4, '#7b8189'); }
+      f(0, 0, len, 3, '#b4b9bf'); f(0, wid - 3, len, 3, '#b4b9bf'); f(0, 2, len, 1, '#6c7078'); f(0, wid - 1, len, 1, '#6c7078');
+      for (let u = 0; u < len; u += 7) { f(u, 0, 1, 2, '#8d939b'); f(u, wid - 3, 1, 2, '#8d939b'); }
+    }
+  }
+}
+
+// ---- коровы и рыбки ----
+const cows = [[13, 43], [19, 45], [15, 47]].map(([tx, ty], i) => ({ x: tx * TS + 8, y: ty * TS + 8, face: i % 2 ? -1 : 1, wait: i, gx: null, anim: 0, graze: 0, moving: false }));
+function cowOk(x, y) {
+  if (islV(2, (x - 9) / TS, y / TS) < 1 || islV(2, (x + 9) / TS, y / TS) < 1 || islV(2, x / TS, (y - 4) / TS) < 1) return false;
+  return !colliders.some(c => x - 9 < c.x + c.w && x + 9 > c.x && y - 3 < c.y + c.h && y + 1 > c.y);
+}
+function updateCows(dt) {
+  for (const c of cows) {
+    c.anim += dt; c.moving = false;
+    if (c.graze > 0) { c.graze -= dt; continue; }
+    if (c.wait > 0) { c.wait -= dt; if (Math.random() < dt * 0.3) c.graze = 2 + Math.random() * 2; continue; }
+    if (c.gx == null) { const a = Math.random() * 6.28, r = 16 + Math.random() * 48; c.gx = c.x + Math.cos(a) * r; c.gy = c.y + Math.sin(a) * r; }
+    const dx = c.gx - c.x, dy = c.gy - c.y, d = Math.hypot(dx, dy);
+    if (d < 2) { c.gx = null; c.wait = 2 + Math.random() * 4; continue; }
+    const st = Math.min(d, 9 * dt), nx = c.x + dx / d * st, ny = c.y + dy / d * st;
+    if (Math.abs(dx) > 0.5) c.face = dx > 0 ? 1 : -1;
+    if (cowOk(nx, ny)) { c.x = nx; c.y = ny; c.moving = true; } else { c.gx = null; c.wait = 1; }
+  }
+}
+const LAKE = ISL[1].lake;
+const fish = [0, 1, 2, 3].map(i => ({ x: LAKE.x * TS + (i - 1.5) * 10, y: LAKE.y * TS + (i % 2 ? 5 : -5), a: i * 1.6, v: 6 + i * 2, jump: 0, next: 3 + i * 3 }));
+function updateFish(dt) {
+  for (const f of fish) {
+    f.a += (Math.random() - 0.5) * dt * 2;
+    const nx = f.x + Math.cos(f.a) * f.v * dt, ny = f.y + Math.sin(f.a) * f.v * dt * 0.7;
+    if (Math.hypot((nx / TS - LAKE.x) / LAKE.rx, (ny / TS - LAKE.y) / LAKE.ry) > 0.72) f.a += Math.PI * 0.7; else { f.x = nx; f.y = ny; }
+    if (f.jump > 0) { f.jump -= dt; if (f.jump <= 0 && state.scene === 'island') burst(f.x, f.y, 6, ['#d8f4f8', '#ffffff'], { up: 30, sp: 30, g: 120 }); }
+    else if ((f.next -= dt) <= 0) { f.jump = 0.6; f.next = 6 + Math.random() * 10; if (state.scene === 'island') burst(f.x, f.y, 5, ['#d8f4f8', '#ffffff'], { up: 25, sp: 25, g: 120 }); }
+  }
+}
+function drawFish() {
+  for (const f of fish) {
+    const sx = Math.round(f.x) - camX, sy = Math.round(f.y) - camY, d = Math.cos(f.a) >= 0 ? 1 : -1;
+    if (f.jump > 0) {
+      const h = Math.round(Math.sin((0.6 - f.jump) / 0.6 * Math.PI) * 8);
+      ctx.fillStyle = '#f08a2b'; ctx.fillRect(sx - 2, sy - h, 4, 2);
+      ctx.fillStyle = '#c4651a'; ctx.fillRect(sx - 3 * d, sy - h, 1, 2);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(sx + d, sy - h, 1, 1);
+    } else { ctx.fillStyle = 'rgba(200,90,30,.55)'; ctx.fillRect(sx - 2, sy, 4, 2); ctx.fillRect(sx - 3 * d, sy, 1, 2); }
+  }
+}
+
+// ---- панорамы со второго этажа мельницы ----
+let pano = null, noUI = false;
+const SHIPS = [{ x: 0.1, d: 0.12, v: 0.006, big: false }, { x: 0.65, d: 0.4, v: -0.01, big: true }, { x: 0.3, d: 0.78, v: 0.014, big: true }, { x: 0.85, d: 0.05, v: -0.004, big: false }];
+function openPano(kind) { fadeThen(() => { pano = kind; }); }
+function closePano() { fadeThen(() => { pano = null; }); }
+function disk(x, y, r, col) {
+  ctx.fillStyle = col;
+  for (let dy = -r; dy <= r; dy++) { const w = Math.round(Math.sqrt(r * r - dy * dy)); ctx.fillRect(Math.round(x) - w, Math.round(y) + dy, w * 2, 1); }
+}
+function drawSky(w, h, LT) {
+  const [top, bot] = skyPair(LT), hr = hourOf(), night = LT.dark > 0.4;
+  for (let i = 0; i < 8; i++) { ctx.fillStyle = lerpHex(top, bot, i / 7); ctx.fillRect(0, Math.floor(h * i / 8), w, Math.ceil(h / 8) + 1); }
+  if (night && !state.rain.on) for (let i = 0; i < 60; i++) if (Math.sin(time * 2 + i * 1.7) > -0.6) {
+    ctx.fillStyle = hash(i, 7) > 0.8 ? '#ffffff' : '#c8d0ff'; ctx.fillRect(Math.floor(hash(i, 3) * w), Math.floor(hash(3, i) * h * 0.9), 1, 1);
+  }
+  if (!state.rain.on) {
+    const day = (hr - 6) / 14, nt = ((hr + 4) % 24) / 10;
+    if (day >= 0 && day <= 1) { const x = w * (0.1 + 0.8 * day), y = h * (0.92 - Math.sin(day * Math.PI) * 0.7); disk(x, y, 9, '#fde9a0'); disk(x, y, 7, '#fff4c8'); }
+    else { const x = w * (0.1 + 0.8 * nt), y = h * (0.92 - Math.sin(nt * Math.PI) * 0.7); disk(x, y, 6, '#f4e9b0'); ctx.fillStyle = '#d8cc8e'; ctx.fillRect(Math.round(x) - 2, Math.round(y) - 1, 2, 2); }
+  }
+  ctx.fillStyle = state.rain.on ? 'rgba(90,100,115,.9)' : night ? 'rgba(60,70,110,.7)' : 'rgba(255,255,255,.88)';
+  for (let i = 0; i < 6; i++) {
+    const cw = Math.round(18 + hash(i, 11) * 30), cx = Math.round((hash(i, 5) * (w + 80) + time * (2 + i)) % (w + 80)) - 60, cy = Math.round(6 + hash(5, i) * h * 0.5);
+    ctx.fillRect(cx, cy, cw, 4); ctx.fillRect(cx + 4, cy - 3, Math.round(cw * 0.5), 3); ctx.fillRect(cx + Math.round(cw * 0.4), cy - 5, Math.round(cw * 0.35), 2);
+  }
+}
+function drawSea(y0, LT) {
+  const vw = view.w, vh = view.h, [s1, s2] = seaPair(LT), night = LT.dark > 0.4;
+  for (let i = 0; i < 10; i++) { ctx.fillStyle = lerpHex(s1, s2, i / 9); const y = y0 + Math.floor((vh - y0) * i / 10); ctx.fillRect(0, y, vw, Math.ceil((vh - y0) / 10) + 1); }
+  ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(0, y0, vw, 1);
+  for (let i = 0; i < 70; i++) {
+    if (Math.sin(time * 2 + i) < 0) continue;
+    const d = hash(i, 21), y = y0 + 2 + Math.pow(d, 1.6) * (vh - y0 - 4), x = (hash(21, i) * vw + time * (4 + d * 10)) % (vw + 20) - 10;
+    ctx.fillStyle = night ? 'rgba(160,180,255,.35)' : 'rgba(230,248,255,.7)';
+    ctx.fillRect(Math.round(x), Math.round(y), 2 + Math.floor(d * 8), 1);
+  }
+}
+function renderPano() {
+  const vw = view.w, vh = view.h, LT = lightAt(hourOf());
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  if (pano === 'sea') {
+    const hz = Math.round(vh * 0.45);
+    drawSky(vw, hz, LT); drawSea(hz, LT);
+    for (const sh of SHIPS.slice().sort((a, b) => a.d - b.d)) {
+      const left = sh.v < 0, spr = sh.big ? (left ? SPR.shipBigL : SPR.shipBig) : (left ? SPR.shipSmallL : SPR.shipSmall);
+      const k = sh.d > 0.6 ? 2 : 1, y = Math.round(hz + sh.d * (vh - hz) * 0.85 - spr.height * k + 3 * k + Math.sin(time * 1.5 + sh.x * 10));
+      const x = Math.round(sh.x * vw - spr.width * k / 2);
+      ctx.drawImage(spr, x, y, spr.width * k, spr.height * k);
+      ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.fillRect(x + (left ? spr.width * k : -6 * k), y + spr.height * k - 3 * k, 6 * k, 1);
+    }
+    ctx.fillStyle = LT.dark > 0.4 ? '#8890b0' : '#2b2b30';
+    for (let i = 0; i < 4; i++) {
+      const x = Math.round((time * (10 + i * 2) + i * 90) % (vw + 40)) - 20, y = Math.round(hz * 0.45 + Math.sin(time * 1.3 + i) * 6 + i * 7), up = Math.sin(time * 8 + i) > 0 ? 1 : 0;
+      ctx.fillRect(x - 3, y - up, 3, 1); ctx.fillRect(x + 1, y - up, 3, 1); ctx.fillRect(x, y, 1, 1);
+    }
+  } else {
+    const hz = Math.round(vh * 0.3);
+    drawSky(vw, hz, LT); drawSea(hz, LT);
+    renderIslandInto();
+    // заполняем всё окно ниже горизонта, лишнее по краям обрезается
+    const s = Math.max(vw / PANO_ROI.w, (vh - hz) / (PANO_ROI.h * 0.62));
+    const dw = Math.round(PANO_ROI.w * s), dh = Math.round(PANO_ROI.h * s * 0.62);
+    const dx = Math.round((vw - dw) / 2), dy = hz;
+    ctx.drawImage(panoC, dx, dy, dw, dh);
+    const [, sb] = skyPair(LT), g = ctx.createLinearGradient(0, dy, 0, dy + (vh - hz) * 0.35);
+    g.addColorStop(0, sb); g.addColorStop(1, 'rgba(200,220,240,0)');
+    ctx.globalAlpha = 0.6; ctx.fillStyle = g; ctx.fillRect(0, dy, vw, Math.round((vh - hz) * 0.35)); ctx.globalAlpha = 1;
+  }
+  if (rainI > 0.05) { ctx.fillStyle = 'rgba(200,215,240,.5)'; for (let i = 0; i < 120 * rainI; i++) ctx.fillRect(Math.floor((hash(i, 1) * vw + time * 20) % vw), Math.floor((hash(1, i) * vh + time * 220) % vh), 1, 5); }
+  ctx.fillStyle = '#5e3b1e'; ctx.fillRect(0, 0, vw, 4); ctx.fillRect(0, vh - 4, vw, 4); ctx.fillRect(0, 0, 4, vh); ctx.fillRect(vw - 4, 0, 4, vh);
+  ctx.fillStyle = '#8a5a30'; ctx.fillRect(4, 4, vw - 8, 1); ctx.fillRect(4, 4, 1, vh - 8);
+}
+// живой вид на наш остров: рисуем остров в отдельный холст
+const PANO_ROI = { x: 5 * TS, y: 4 * TS, w: 38 * TS, h: 28 * TS };
+const panoC = canvas(PANO_ROI.w, PANO_ROI.h), panoL = canvas(PANO_ROI.w, PANO_ROI.h);
+function renderIslandInto() {
+  const keep = { ctx, lightC, lctx, w: view.w, h: view.h, camX, camY };
+  ctx = panoC.getContext('2d'); ctx.imageSmoothingEnabled = false; lightC = panoL; lctx = panoL.getContext('2d');
+  view.w = PANO_ROI.w; view.h = PANO_ROI.h; camX = PANO_ROI.x; camY = PANO_ROI.y; noUI = true;
+  try { renderIsland(); } finally {
+    ctx = keep.ctx; lightC = keep.lightC; lctx = keep.lctx; view.w = keep.w; view.h = keep.h; camX = keep.camX; camY = keep.camY; noUI = false;
+  }
+}
+
 // ================= время, погода, курицы =================
 function startRain(mins) { state.rain.on = true; state.rain.left = mins; toast('Пошёл дождь — он польёт все грядки'); }
 function checkPayout() {
@@ -1595,8 +2091,8 @@ function lightAt(h) {
 }
 
 // ================= экран =================
-const ctx = cvs.getContext('2d');
-const lightC = canvas(1, 1), lctx = lightC.getContext('2d');
+let ctx = cvs.getContext('2d');
+let lightC = canvas(1, 1), lctx = lightC.getContext('2d');
 const view = { w: 320, h: 180, s: 3 };
 function resize() {
   const w = innerWidth, h = innerHeight;
@@ -1610,7 +2106,7 @@ addEventListener('resize', resize); resize();
 
 let camX = 0, camY = 0, time = 0;
 function updateCamera() {
-  const ww = state.scene === 'house' ? IW * TS : W * TS, wh = state.scene === 'house' ? IH * TS : H * TS;
+  const RM = ROOMS[state.scene], ww = RM ? RM.w : W * TS, wh = RM ? RM.h : H * TS;
   camX = view.w >= ww ? Math.round((view.w - ww) / -2) : Math.round(Math.max(0, Math.min(ww - view.w, player.x - view.w / 2)));
   camY = view.h >= wh ? Math.round((view.h - wh) / -2) : Math.round(Math.max(0, Math.min(wh - view.h, player.y - 8 - view.h / 2)));
 }
@@ -1623,9 +2119,10 @@ function shadow(x, y, r) {
 function blocked(x, y) {
   const L = x - 5, R = x + 5, T = y - 4, B = y + 1;
   const hit = c => L < c.x + c.w && R > c.x && T < c.y + c.h && B > c.y;
-  if (state.scene === 'house') {
-    if (!houseWalk(L, T) || !houseWalk(R, T) || !houseWalk(L, B) || !houseWalk(R, B)) return true;
-    return HOUSE_COLS.some(hit);
+  const RM = ROOMS[state.scene];
+  if (RM) {
+    if (!RM.walk(L, T) || !RM.walk(R, T) || !RM.walk(L, B) || !RM.walk(R, B)) return true;
+    return RM.cols.some(hit);
   }
   if (!walkable(L, T) || !walkable(R, T) || !walkable(L, B) || !walkable(R, B)) return true;
   return colliders.some(hit) || dynCols.some(hit);
@@ -1638,6 +2135,7 @@ function update(dt) {
     advanceTime(dt * (keys.KeyT ? 60 : 5));
     let mx = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + joy.x;
     let my = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0) + joy.y;
+    if (pano) mx = my = 0;
     const l = Math.hypot(mx, my);
     player.moving = l > 0.2;
     if (player.moving && player.sit) { player.sit = false; player.x = 15; player.y = 106; }
@@ -1650,8 +2148,12 @@ function update(dt) {
       player.walkT += dt;
     } else player.walkT = 0;
     player.actT = Math.max(0, player.actT - dt);
-    if (state.scene === 'house' && player.y > 140) exitHouse();
+    const RM = ROOMS[state.scene];
+    if (RM && RM.exitY && player.y > RM.exitY) RM.onExit();
     updateChickens(dt);
+    updateCows(dt);
+    updateFish(dt);
+    for (const sh of SHIPS) { sh.x += sh.v * dt; if (sh.x > 1.25) sh.x = -0.25; if (sh.x < -0.25) sh.x = 1.25; }
     for (const o of state.objs) if (o.shakeT > 0) o.shakeT -= dt;
     for (const o of state.objs) if (o.type === 'gate' && o.open) {
       const far = state.scene !== 'island' || Math.hypot(player.x - o.tx * TS - 8, player.y - o.ty * TS - 10) > 26;
@@ -1670,8 +2172,8 @@ function update(dt) {
     const s = smoke[i]; s.t += dt; s.y -= 9 * dt; s.x += (6 + Math.sin(s.t * 2) * 4) * dt;
     if (s.t > s.life) smoke.splice(i, 1);
   }
-  if (state.scene === 'house') {
-    if (Math.random() < dt * 3) parts.push({ x: 80 + Math.random() * 16, y: 40, vx: (Math.random() - 0.5) * 10, vy: -15 - Math.random() * 15, g: -5, life: 0.6 + Math.random() * 0.5, t: 0, c: Math.random() < 0.5 ? '#ffd66b' : '#ff9a3a' });
+  if (state.scene !== 'island') {
+    if (state.scene === 'house' && Math.random() < dt * 3) parts.push({ x: 80 + Math.random() * 16, y: 40, vx: (Math.random() - 0.5) * 10, vy: -15 - Math.random() * 15, g: -5, life: 0.6 + Math.random() * 0.5, t: 0, c: Math.random() < 0.5 ? '#ffd66b' : '#ff9a3a' });
     return;
   }
   const want = Math.floor(170 * rainI * view.w * view.h / (320 * 180));
@@ -1724,7 +2226,8 @@ function applyLighting(dark, tint, tintA, lights, rainA) {
     const sx = L.x - camX, sy = L.y - camY, r = L.r;
     if (sx < -r || sy < -r || sx > vw + r || sy > vh + r) continue;
     const gr = lctx.createRadialGradient(sx, sy, 0, sx, sy, r);
-    gr.addColorStop(0, 'rgba(0,0,0,.95)'); gr.addColorStop(0.5, 'rgba(0,0,0,.6)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    const st = L.s ?? 0.95;
+    gr.addColorStop(0, `rgba(0,0,0,${st})`); gr.addColorStop(0.5, `rgba(0,0,0,${st * 0.63})`); gr.addColorStop(1, 'rgba(0,0,0,0)');
     lctx.fillStyle = gr; lctx.fillRect(sx - r, sy - r, r * 2, r * 2);
   }
   ctx.drawImage(lightC, 0, 0);
@@ -1789,7 +2292,13 @@ function drawObj(o) {
     if (st > 0) shadow(x + 8, y + 15, st === 2 ? 9 : 6);
     blit(spr, x + 8 - spr.width / 2 + sh, y + 17 - spr.height);
   }
-  else if (o.type === 'mill') blit(SPR.site, x - 1, y - 5);
+  else if (o.type === 'mill') {
+    if (!o.built) { blit(SPR.site, x - 1, y - 5); return; }
+    shadow(x + 24, y + 46, 20);
+    blit(SPR.millTower, x - 1, y - 51);
+    if (curLit) { ctx.fillStyle = '#ffd66b'; ctx.fillRect(x + 22 - camX, y - camY, 4, 6); ctx.fillRect(x + 22 - camX, y + 13 - camY, 4, 6); }
+    drawSails(x + 24, y - 20, time * 0.8);
+  }
 }
 let curLit = false;
 function objLights(dark) {
@@ -1797,7 +2306,9 @@ function objLights(dark) {
   for (const o of state.objs) {
     if (o.type === 'lamp') out.push({ x: o.tx * TS + 8, y: o.ty * TS - 6, r: 60, a: 0.4 * dark });
     else if (o.type === 'fence' && o.lamp) out.push({ x: o.tx * TS + 8, y: o.ty * TS + 1, r: 40, a: 0.35 * dark });
+    else if (o.type === 'mill' && o.built) out.push({ x: o.tx * TS + 24, y: o.ty * TS + 6, r: 30, a: 0.3 * dark });
   }
+  for (const p of bridgeLamps()) out.push({ x: p.x, y: p.y - 10, r: 22, a: 0.08 * dark, s: 0.45 });
   return out;
 }
 function drawChicken(ch) {
@@ -1834,7 +2345,7 @@ function drawBuildGhost() {
   if (canPlace(k, tgt.tx, tgt.ty)) { ctx.globalAlpha = pulse; ghostFor(k, tgt.tx, tgt.ty); ctx.globalAlpha = 1; }
 }
 
-function render() { if (state.scene === 'house') renderHouse(); else renderIsland(); }
+function render() { if (pano) renderPano(); else if (ROOMS[state.scene]) renderRoom(ROOMS[state.scene]); else renderIsland(); }
 function renderIsland() {
   const vw = view.w, vh = view.h, LT = lightAt(hourOf());
   const dark = Math.min(0.72, LT.dark + 0.12 * rainI), lit = dark > 0.12;
@@ -1856,6 +2367,8 @@ function renderIsland() {
   ctx.fillStyle = 'rgba(220,245,255,.6)';
   ctx.fillRect(BOAT.x - camX + 2, BOAT.y + 16 + bob - camY, 36, 1);
   blit(SPR.boat, BOAT.x - 1, BOAT.y - 1 + bob);
+  drawFish();
+  drawBridges();
   for (const b of state.beds) blit(b.wet > 0 ? SPR.bedWet : SPR.bedDry, b.tx * TS, b.ty * TS);
   curLit = lit;
   const list = [];
@@ -1864,6 +2377,9 @@ function renderIsland() {
   for (const o of state.objs) list.push({ y: (o.ty + (o.h || 1)) * TS - (o.type === 'coop' || o.h ? 1 : 2), obj: o });
   for (const ch of state.chickens) if (!ch.inside) list.push({ y: ch.y, chick: ch });
   list.push({ y: player.y, who: 'player' }, { y: TRADER.ty * TS + 14, who: 'trader' });
+  for (const c of cows) list.push({ y: c.y, cow: c });
+  for (const B of BRIDGES) if (state.bridges[B.id]) list.push({ y: B.worker.ty * TS + 14, worker: B.worker });
+  for (const p of bridgeLamps()) list.push({ y: p.y, blamp: 1, x: p.x });
   list.sort((a, b) => a.y - b.y);
   for (const o of list) {
     if (o.crop) {
@@ -1876,7 +2392,14 @@ function renderIsland() {
       }
     } else if (o.obj) drawObj(o.obj);
     else if (o.chick) drawChicken(o.chick);
-    else if (o.who === 'player') drawPlayer();
+    else if (o.who === 'player') { if (state.scene === 'island') drawPlayer(); }
+    else if (o.cow) {
+      const c = o.cow, fr = c.graze > 0 ? 2 : c.moving ? (Math.floor(c.anim * 5) % 2 ? 1 : 0) : 0;
+      shadow(c.x, c.y, 8); blit((c.face < 0 ? SPR.cowL : SPR.cowR)[fr], c.x - 11, c.y - 15);
+    } else if (o.worker) {
+      const W0 = o.worker, x = W0.tx * TS + 8, y = W0.ty * TS + 14, dx = player.x - x;
+      shadow(x, y, 5); blit(SPR.worker[Math.abs(dx) < 40 && state.scene === 'island' ? (dx > 0 ? 2 : 3) : 0][0], x - 9, y - 23 + (Math.floor(time * 1.5) % 2));
+    } else if (o.blamp) { shadow(o.x, o.y, 2); blit(curLit ? SPR.bridgeLampLit : SPR.bridgeLamp, o.x - 4, o.y - 13); }
     else if (o.who === 'trader') {
       const tx = TRADER.tx * TS + 8, ty = TRADER.ty * TS + 14;
       const dx = player.x - tx, dy = player.y - ty, near = Math.hypot(dx, dy) < 56;
@@ -1911,7 +2434,7 @@ function renderIsland() {
       else { ctx.fillRect(sx - 2, sy, 1, 1); ctx.fillRect(sx + 2, sy, 1, 1); ctx.fillRect(sx - 1, sy - 1, 3, 1); }
     }
   }
-  drawBuildGhost();
+  if (!noUI) drawBuildGhost();
   applyLighting(dark, LT.tint, LT.tintA, LIGHTS.map(L => ({ x: L.x, y: L.y, r: L.r + Math.sin(time * 3 + L.x) * 1.5, a: 0.4 * dark })).concat(objLights(dark)), rainI);
   if (dark > 0.3 && rainI < 0.3) {
     ctx.globalCompositeOperation = 'lighter';
@@ -1925,7 +2448,7 @@ function renderIsland() {
     ctx.globalCompositeOperation = 'source-over';
   }
   for (const o of state.objs) if (o.type === 'coop' && o.eggs > 0) drawExclaim(o.tx * TS + 8, o.ty * TS - 13);
-  drawCursor();
+  if (!noUI) drawCursor();
 }
 function drawWindows(dark) {
   const night = dark > 0.15;
@@ -1936,11 +2459,7 @@ function drawWindows(dark) {
     ctx.fillStyle = '#6e4527'; ctx.fillRect(x + 5, y, 2, 9); ctx.fillRect(x, y + 4, 12, 1);
   }
 }
-function renderHouse() {
-  const vw = view.w, vh = view.h, LT = lightAt(hourOf());
-  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = '#140d10'; ctx.fillRect(0, 0, vw, vh);
-  ctx.drawImage(INTERIOR, -camX, -camY);
+function drawHouseDyn(LT) {
   // окна
   const nightSky = LT.dark > 0.45, dusk = LT.tintA > 0.15;
   for (const wx of WIN_IN) {
@@ -1975,7 +2494,21 @@ function renderHouse() {
   ctx.fillStyle = '#6e4527'; ctx.fillRect(78 + ox, 46 + oy, 20, 4);
   ctx.fillStyle = '#8a5a30'; ctx.fillRect(80 + ox, 45 + oy, 16, 2);
   ctx.fillStyle = '#c9a06a'; ctx.fillRect(78 + ox, 47 + oy, 1, 2); ctx.fillRect(97 + ox, 47 + oy, 1, 2);
-  const list = HOUSE_PROPS.map(p => ({ y: p.sy, p }));
+}
+function houseLights(LT) {
+  const fl = Math.sin(time * 9) * 3 + Math.sin(time * 13) * 2;
+  const lights = [{ x: 88, y: 42, r: 88 + fl, a: 0.35 + 0.05 * Math.sin(time * 11) }];
+  if (LT.dark > 0.15) lights.push({ x: 136, y: 48, r: 32, a: 0.25 });
+  if (LT.dark < 0.35) for (const wx of WIN_IN) lights.push({ x: wx + 12, y: 36, r: 46 * (1 - LT.dark * 2) });
+  return { dark: Math.min(0.72, 0.14 + LT.dark * 0.8 + 0.08 * rainI), lights };
+}
+function renderRoom(RM) {
+  const LT = lightAt(hourOf());
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#140d10'; ctx.fillRect(0, 0, view.w, view.h);
+  ctx.drawImage(RM.bg, -camX, -camY);
+  RM.draw(LT);
+  const list = RM.props.map(p => ({ y: p.sy, p }));
   list.push({ y: player.sit ? 100 : player.y, who: 'player' });
   list.sort((a, b) => a.y - b.y);
   for (const o of list) {
@@ -1983,13 +2516,78 @@ function renderHouse() {
     else drawPlayer();
   }
   drawParts();
-  const fl = Math.sin(time * 9) * 3 + Math.sin(time * 13) * 2;
-  const lights = [{ x: 88, y: 42, r: 88 + fl, a: 0.35 + 0.05 * Math.sin(time * 11) }];
-  if (LT.dark > 0.15) lights.push({ x: 136, y: 48, r: 32, a: 0.25 });
-  if (LT.dark < 0.35) for (const wx of WIN_IN) lights.push({ x: wx + 12, y: 36, r: 46 * (1 - LT.dark * 2) });
-  applyLighting(Math.min(0.72, 0.14 + LT.dark * 0.8 + 0.08 * rainI), [255, 205, 160], 0.12, lights, 0);
+  const L = RM.lights(LT);
+  applyLighting(L.dark, [255, 205, 160], 0.12, L.lights, 0);
   drawCursor();
 }
+
+// ---- мельница: два этажа ----
+const MILL1_COLS = [{ x: 54, y: 72, w: 36, h: 14 }, { x: 116, y: 60, w: 16, h: 12 }, { x: 18, y: 62, w: 14, h: 8 }];
+const MILL1_PROPS = [{ spr: SPR.millstone, x: 51, y: 57, sy: 86 }, { spr: SPR.barrel, x: 17, y: 55, sy: 70 }];
+const MILL2_COLS = [{ x: 66, y: 60, w: 12, h: 10 }, { x: 106, y: 78, w: 30, h: 28 }, { x: 14, y: 92, w: 38, h: 10 }];
+const MILL2_PROPS = [{ spr: SPR.shaft, x: 65, y: -1, sy: 70 }, { spr: SPR.bench, x: 13, y: 88, sy: 102 }];
+function mill1Walk(px, py) { if (py > 122) return px >= 62 && px <= 82 && py < 134; return px >= 5 && px <= 139 && py >= 46; }
+function mill2Walk(px, py) { return px >= 5 && px <= 139 && py >= 50 && py <= 106; }
+function mill1Action() {
+  const { tx, ty } = targetTile();
+  if (tx >= 7 && ty <= 4) return { hint: 'Подняться на второй этаж', run: climbUp };
+  if (tx <= 3 && ty <= 2) return { hint: 'Полка для муки — здесь будет храниться мука' };
+  if (tx === 4 && ty <= 2) return { hint: 'Узкое окно' };
+  if (tx >= 3 && tx <= 5 && ty >= 4 && ty <= 5) return { hint: 'Жернова — скоро будут молоть пшеницу в муку' };
+  if (tx === 1 && ty >= 3 && ty <= 4) return { hint: 'Бочка' };
+  if (tx === 4 && ty >= 7) return { hint: 'Выйти на улицу', run: exitMill };
+  return null;
+}
+function mill2Action() {
+  const { tx, ty } = targetTile();
+  if (ty <= 3 && player.dir === 1 && tx <= 3) return { hint: 'Смотреть на море', run: () => openPano('sea') };
+  if (ty <= 3 && player.dir === 1 && tx >= 5) return { hint: 'Смотреть на наш остров', run: () => openPano('island') };
+  if (tx >= 6 && ty >= 5) return { hint: 'Спуститься вниз', run: climbDown };
+  if (tx === 4) return { hint: 'Вал крыльев мельницы — крутится' };
+  return null;
+}
+function drawMill1Dyn(LT) {
+  const [top, bot] = skyPair(LT);
+  ctx.fillStyle = lerpHex(top, bot, 0.5); ctx.fillRect(66 - camX, 10 - camY, 12, 20);
+  ctx.fillStyle = '#5d6168'; ctx.fillRect(71 - camX, 10 - camY, 2, 20);
+}
+function drawMill2Dyn(LT) {
+  const [top, bot] = skyPair(LT), [s1, s2] = seaPair(LT);
+  for (const wx of [12, 80]) {
+    const x = wx - camX, y = 8 - camY;
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, 52, 32); ctx.clip();
+    for (let i = 0; i < 4; i++) { ctx.fillStyle = lerpHex(top, bot, i / 3); ctx.fillRect(x, y + i * 4, 52, 4); }
+    ctx.fillStyle = s1; ctx.fillRect(x, y + 16, 52, 8); ctx.fillStyle = s2; ctx.fillRect(x, y + 24, 52, 8);
+    if (wx === 12) {
+      const sx = Math.floor((time * 3) % 70) - 10;
+      ctx.drawImage(SPR.shipSmall, x + sx, y + 9);
+    } else {
+      ctx.fillStyle = '#d9bf80'; ctx.fillRect(x + 8, y + 18, 36, 10);
+      ctx.fillStyle = '#5a9a3e'; ctx.fillRect(x + 10, y + 17, 32, 9);
+      ctx.fillStyle = '#c44d3a'; ctx.fillRect(x + 18, y + 18, 5, 3);
+      ctx.fillStyle = '#2f6f2e'; ctx.fillRect(x + 30, y + 16, 4, 5); ctx.fillRect(x + 36, y + 18, 3, 4);
+    }
+    if (state.rain.on) { ctx.fillStyle = 'rgba(220,235,255,.5)'; for (let i = 0; i < 8; i++) ctx.fillRect(x + Math.floor(hash(i, wx) * 52), y + Math.floor((time * 30 + hash(wx, i) * 96) % 32), 1, 3); }
+    ctx.restore();
+    ctx.fillStyle = '#5e3b1e'; ctx.fillRect(x + 25, y, 2, 32); ctx.fillRect(x, y + 15, 52, 2);
+  }
+}
+function mill1Lights(LT) {
+  const lights = [{ x: 100, y: 22, r: 60, a: 0.25 }];
+  if (LT.dark < 0.4) lights.push({ x: 72, y: 26, r: 44 * (1 - LT.dark * 2) });
+  return { dark: Math.min(0.72, 0.3 + LT.dark * 0.55 + 0.06 * rainI), lights };
+}
+function mill2Lights(LT) {
+  const lights = [];
+  if (LT.dark < 0.4) for (const wx of [38, 106]) lights.push({ x: wx, y: 30, r: 64 * (1 - LT.dark * 2) });
+  if (LT.dark > 0.15) lights.push({ x: 72, y: 54, r: 50, a: 0.25 });
+  return { dark: Math.min(0.72, 0.12 + LT.dark * 0.75 + 0.08 * rainI), lights };
+}
+const ROOMS = {
+  house: { w: IW * TS, h: IH * TS, bg: INTERIOR, cols: HOUSE_COLS, walk: houseWalk, props: HOUSE_PROPS, action: houseAction, draw: drawHouseDyn, lights: houseLights, exitY: 140, onExit: exitHouse },
+  mill1: { w: 144, h: 128, bg: MILL1, cols: MILL1_COLS, walk: mill1Walk, props: MILL1_PROPS, action: mill1Action, draw: drawMill1Dyn, lights: mill1Lights, exitY: 128, onExit: exitMill },
+  mill2: { w: 144, h: 112, bg: MILL2, cols: MILL2_COLS, walk: mill2Walk, props: MILL2_PROPS, action: mill2Action, draw: drawMill2Dyn, lights: mill2Lights },
+};
 
 // ================= интерфейс =================
 $('coinIcon').src = ICON_URL.coin;
@@ -2058,6 +2656,8 @@ $('modalBody').addEventListener('click', e => {
   const d = b.dataset;
   if (d.buy) { const n = +d.n, cost = ITEMS[d.buy].buy * n; if (state.coins >= cost) { state.coins -= cost; state.bag[d.buy] += n; } }
   if (d.chicken) buyChicken();
+  if (d.bridge) upgradeBridge(d.bridge);
+  if (d.buildmill) { buildMill(); closeModal(); return; }
   if (d.axe && !state.hasAxe && state.coins >= ITEMS.axe.buy) { state.coins -= ITEMS.axe.buy; state.hasAxe = true; toast('Топор куплен — он в слоте 5'); }
   if (d.put) { const n = d.n === 'all' ? state.bag[d.put] : 1; state.bag[d.put] -= n; state.chest[d.put] += n; }
   if (d.take) { state.bag[d.take] += state.chest[d.take]; state.chest[d.take] = 0; }
@@ -2092,9 +2692,10 @@ function openShop() {
       <div class="pr">${img('coin')}${ITEMS.axe.buy}</div>
       <div class="btns"><button class="px" data-axe="1" ${state.hasAxe || state.coins < ITEMS.axe.buy ? 'disabled' : ''}>${state.hasAxe ? 'Куплен' : 'Купить'}</button></div></div>
     ${shopRow('sapling')}
+    <h3>СТРОЙКА</h3>${shopRow('cement', 5)}
     <h3>ЧЕРТЕЖИ</h3>${(() => {
       const owned = state.bag.millPlan > 0 || state.objs.some(o => o.type === 'mill');
-      return `<div class="row">${img('millPlan')}<div class="nm">Чертёж мельницы<small>высокая мельница на 3×3 клетки: сначала размечаешь место молотком, потом нужны ${MILL_NEED.wood} древесины и ${MILL_NEED.coins} монет</small></div>
+      return `<div class="row">${img('millPlan')}<div class="nm">Чертёж мельницы<small>высокая мельница на 3×3 клетки: сначала размечаешь место молотком, потом нужны ${MILL_NEED.wood} древесины, ${MILL_NEED.cement} пакетов стройсмеси и ${MILL_NEED.coins} монет</small></div>
       <div class="pr">${img('coin')}${ITEMS.millPlan.buy}</div>
       <div class="btns"><button class="px" data-buy="millPlan" data-n="1" ${owned || state.coins < ITEMS.millPlan.buy ? 'disabled' : ''}>${owned ? 'Есть' : 'Купить'}</button></div></div>`;
     })()}
@@ -2117,12 +2718,15 @@ function openChest() {
   });
 }
 function openSite() {
-  openModal(() => `<h2>Стройка мельницы</h2>
-    <div class="say">Место размечено: 3×3 клетки. Для постройки понадобится:</div>
-    <div class="row">${img('wood')}<div class="nm">Древесина<small>в мешочке: ${state.bag.wood}</small></div><div class="pr">${MILL_NEED.wood}</div></div>
-    <div class="row">${img('coin')}<div class="nm">Монеты<small>у тебя: ${state.coins}</small></div><div class="pr">${MILL_NEED.coins}</div></div>
-    <div class="foot">Строительство скоро откроется — пока запасай древесину: руби ёлки топором и сажай новые.<br>
-    Передумал с местом? Снеси стройку кувалдой — чертёж вернётся в мешочек.</div>`);
+  openModal(() => {
+    const need = [['wood', 'Древесина', state.bag.wood, MILL_NEED.wood], ['cement', 'Пакеты стройсмеси', state.bag.cement, MILL_NEED.cement], ['coin', 'Монеты', state.coins, MILL_NEED.coins]];
+    const ok = need.every(n => n[2] >= n[3]);
+    return `<h2>Стройка мельницы</h2>
+    <div class="say">Место размечено: 3×3 клетки. Принеси материалы — и мельница вырастет прямо здесь.</div>
+    ${need.map(([k, name, have, n]) => `<div class="row">${img(k)}<div class="nm">${name}<small>есть: ${have}</small></div><div class="pr">${Math.min(have, n)} / ${n}${have >= n ? ' ✓' : ''}</div></div>`).join('')}
+    <div style="text-align:right;margin-top:10px"><button class="px" data-buildmill="1" ${ok ? '' : 'disabled'}>Построить мельницу</button></div>
+    <div class="foot">Древесину дают ёлки (топор), стройсмесь продаёт торговец.<br>Передумал с местом? Снеси стройку кувалдой — чертёж вернётся в мешочек.</div>`;
+  });
 }
 function openBag() {
   if (busy) return;
@@ -2130,7 +2734,7 @@ function openBag() {
     ${btn ? `<br><button class="px ${btn.on ? 'alt' : ''}" data-${btn.attr}="${k}">${btn.on ? 'В руке' : 'Взять'}</button>` : ''}</div>`;
   openModal(() => `<h2>Мешочек</h2>
     <h3>СЕМЕНА</h3><div class="grid">${SEEDS.map(k => cell(k, { attr: 'hand', on: state.seedType === k })).join('')}</div>
-    <h3>УРОЖАЙ И РЕСУРСЫ</h3><div class="grid">${PRODUCE.map(k => cell(k)).join('')}</div>
+    <h3>УРОЖАЙ И РЕСУРСЫ</h3><div class="grid">${PRODUCE.concat('cement').map(k => cell(k)).join('')}</div>
     <h3>ПОСТРОЙКИ</h3><div class="grid">${BUILDS.map(k => cell(k, { attr: 'build', on: state.buildType === k })).join('')}</div>
     <div class="foot">Постройки ставятся молотком (1), сносятся кувалдой (2) и возвращаются сюда.<br>
     Лейка (3): ${state.water}/${CAN_MAX}. Топор (5): ${state.hasAxe ? 'есть' : 'нет'}. Куриц: ${state.chickens.length}.</div>
@@ -2140,7 +2744,7 @@ function openBag() {
 // ================= цикл =================
 let last = performance.now();
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
   update(dt); render(); updateHUD(false);
   requestAnimationFrame(frame);
 }

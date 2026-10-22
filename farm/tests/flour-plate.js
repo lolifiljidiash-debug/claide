@@ -63,7 +63,7 @@ const { chromium } = require(require('child_process').execSync('npm root -g').to
     const c = state.objs.find(o => o.type === 'cabin');
     state.workers.push({ id: 1, name: 'Даша', fem: 1, pal: 1, x: c.tx * 16 + 8, y: (c.ty + 2) * 16 + 10, dir: 0, mode: 'housed', home: { tx: c.tx, ty: c.ty }, job: 'beds', inside: false, carry: {}, seed: null, task: null, path: [], full: 20 });
     state.t = 10 * 60;
-    state.inCabin = { tx: c.tx, ty: c.ty }; state.scene = 'cabin'; player.x = 50; player.y = 76; player.dir = 1;
+    state.inCabin = { tx: c.tx, ty: c.ty }; state.scene = 'cabin'; player.x = 58; player.y = 84; player.dir = 1;
   });
   const ph = await ev(() => getAction().hint);
   check(/Тарелка: пусто/.test(ph), 'plate hint: ' + ph);

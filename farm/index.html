@@ -125,6 +125,8 @@ const IW = 11, IH = 9; // комната в домике, в тайлах
 const DAY = 1440, WET_MAX = 720, CAN_MAX = 10, FEED_CAP = 6, COOP_CAP = 4, EGG_CAP = 4, GROW_SPRUCE = 1440;
 const MILL_NEED = { wood: 30, cement: 10, coins: 250 }, MILL_FIX = { wood: 5, cement: 3 };
 const LOG_FUEL = 360, FIRE_MAX = 1440, PILE_CAP = 20;
+// мельница: 2 пшеницы → 1 мука за GRIND_TIME минут (в дождь быстрее, в грозу втрое быстрее)
+const GRIND_TIME = 40, HOPPER_CAP = 20, FLOUR_CAP = 30, PLATE_CAP = 4;
 const ITEMS = {
   seedWheat: { name: 'Семена пшеницы', buy: 5, note: 'растёт ~2 мин, если полита' },
   seedCarrot: { name: 'Семена моркови', buy: 10, note: 'растёт ~3 мин' },
@@ -147,6 +149,8 @@ const ITEMS = {
   seedbox: { name: 'Ящик для семян', acc: 'ящик для семян', buy: 30, note: 'работник берёт отсюда семена и пшеницу' },
   bakedPotato: { name: 'Печёная картошка' },
   broth: { name: 'Бульон' },
+  bread: { name: 'Хлеб' },
+  flour: { name: 'Мука', sell: 40 },
   wood: { name: 'Древесина', buy: 8, sell: 5, note: 'дрова для камина и стройки' },
   wheat: { name: 'Пшеница', sell: 12 },
   carrot: { name: 'Морковь', sell: 28 },
@@ -173,10 +177,14 @@ const PLAN_OF = { mill: 'millPlan', cabin: 'cabinPlan', kitchen: 'kitchenPlan' }
 const RECIPES = {
   bakedPotato: { name: 'Печёная картошка', need: { potato: 1 }, water: 0, time: 60, energy: 30 },
   broth: { name: 'Бульон', need: { potato: 1, carrot: 1, beet: 1 }, water: 2, time: 120, energy: 70 },
+  bread: { name: 'Хлеб', need: { flour: 1, egg: 1 }, water: 1, time: 90, energy: 50 },
 };
+// что можно положить на тарелку работнику и насколько это его насытит
+const PLATE_FOOD = { potato: 20, carrot: 20, beet: 25, bakedPotato: 40, bread: 50, broth: 70 };
+const FOOD_COL = { potato: '#c9a063', carrot: '#f08a2b', beet: '#8e1f4a', bakedPotato: '#a8743a', bread: '#d9a05a', broth: '#c4653a' };
 const HIRE_COST = 150, FERRY_TIME = 60;
 const NAMES = [['Ваня', 0], ['Петя', 0], ['Миша', 0], ['Гриша', 0], ['Федя', 0], ['Даша', 1], ['Оля', 1], ['Нина', 1], ['Света', 1], ['Маша', 1]];
-const PRODUCE = ['wheat', 'carrot', 'beet', 'potato', 'egg', 'wood'];
+const PRODUCE = ['wheat', 'carrot', 'beet', 'potato', 'egg', 'flour', 'wood'];
 const TOOLS = [
   { key: 'hammer', name: 'Молоток' },
   { key: 'sledge', name: 'Кувалда' },
@@ -892,7 +900,7 @@ function makeMillstone() {
   P.ell(20, 22, 19, 7.5, '#6c7078'); P.ell(20, 20, 19, 7.5, '#9aa1a8'); P.ell(20, 15, 14, 6, '#7b8189'); P.ell(20, 13, 14, 6, '#b4b9bf');
   for (const [x, y] of [[10, 13], [26, 11], [15, 16], [28, 15]]) P.r(x, y, 4, 1, '#9aa1a8');
   P.ell(20, 13, 3, 1.6, '#4a4e54');
-  P.r(16, 0, 8, 7, '#8a5a30'); P.r(16, 0, 8, 1, '#b07a45'); P.r(17, 7, 6, 3, '#6e4527'); P.r(18, 2, 4, 3, '#f2cc4c');
+  P.r(16, 0, 8, 7, '#8a5a30'); P.r(16, 0, 8, 1, '#b07a45'); P.r(17, 7, 6, 3, '#6e4527'); P.r(18, 2, 4, 3, '#3a2418');
   return outline(c, '#2a2a30');
 }
 function makeBarrel() {
@@ -932,8 +940,6 @@ function makeMillFloor1() {
   // полка для муки
   P.r(10, 8, 48, 30, '#6e4527'); P.r(12, 10, 44, 26, '#3a2418');
   for (const y of [19, 29, 36]) { P.r(10, y, 48, 2, '#a8713f'); P.r(10, y, 48, 1, '#cf9a5e'); }
-  const sack = (x, y) => { P.r(x, y, 8, 8, '#efe6d2'); P.r(x + 1, y - 1, 6, 1, '#efe6d2'); P.r(x + 2, y - 2, 4, 1, '#d9ccb0'); P.r(x + 6, y, 2, 8, '#d9ccb0'); P.p(x + 3, y + 3, '#c9a06a'); P.p(x + 4, y + 4, '#c9a06a'); };
-  sack(14, 11); sack(25, 11); sack(42, 21);
   for (const x of [14, 22, 30]) { P.r(x, 31, 5, 5, '#c4653a'); P.r(x, 31, 5, 1, '#d9774a'); }
   // лестница на второй этаж
   P.r(114, 0, 20, 4, '#0e0a08');
@@ -1168,6 +1174,8 @@ const ICON = {
   }),
   seedbox: icon(P => { P.r(1, 5, 14, 9, '#a8713f'); P.r(1, 3, 14, 4, '#8fae5a'); P.r(1, 3, 14, 1, '#b5d080'); P.r(6, 8, 4, 4, '#d9b77a'); P.r(7, 9, 2, 2, '#f2cc4c'); P.r(1, 13, 14, 1, '#6e4527'); }),
   bakedPotato: icon(P => { P.circ(8, 10, 5, '#a8743a'); P.circ(7, 9, 3.4, '#c9a063'); P.r(5, 7, 5, 2, '#f6e5b6'); P.p(7, 6, '#f7d24a'); P.p(6, 3, '#ffffff'); P.p(9, 2, '#ffffff'); P.p(8, 4, '#ffffff'); }, '#5a3a1e'),
+  flour: icon(P => { P.r(4, 5, 8, 9, '#efe6d2'); P.r(5, 4, 6, 1, '#efe6d2'); P.r(6, 2, 4, 2, '#d9ccb0'); P.r(5, 3, 6, 1, '#b8955a'); P.r(11, 5, 1, 9, '#d9ccb0'); P.r(4, 13, 8, 1, '#d9ccb0'); P.r(7, 7, 2, 4, '#f2cc4c'); P.p(6, 8, '#c9962f'); P.p(9, 8, '#c9962f'); P.p(6, 10, '#c9962f'); P.p(9, 10, '#c9962f'); }, '#5a4630'),
+  bread: icon(P => { P.ell(8, 10, 6.5, 3.6, '#a8642a'); P.ell(8, 9, 6, 3, '#d9a05a'); for (const x of [5, 8, 11]) { P.p(x, 8, '#f6d79a'); P.p(x + 1, 9, '#a8642a'); } P.p(4, 4, '#ffffff'); P.p(7, 3, '#ffffff'); }, '#5a3a1e'),
   broth: icon(P => { P.r(2, 9, 12, 4, '#c4653a'); P.r(3, 13, 10, 1, '#a5502c'); P.r(2, 8, 12, 2, '#e8c070'); P.p(5, 8, '#f08a2b'); P.p(9, 8, '#8e1f4a'); P.p(11, 9, '#4fae3c'); P.p(5, 4, '#ffffff'); P.p(8, 3, '#ffffff'); P.p(10, 5, '#ffffff'); P.p(6, 6, '#ffffff'); }, '#5a2a1a'),
   energy: icon(P => { P.r(8, 1, 4, 2, '#f7d24a'); P.r(6, 3, 4, 3, '#f7d24a'); P.r(4, 6, 8, 2, '#f7d24a'); P.r(7, 8, 4, 2, '#f7d24a'); P.r(6, 10, 3, 2, '#f7d24a'); P.r(5, 12, 2, 3, '#f7d24a'); P.p(9, 1, '#fff2b0'); P.p(5, 6, '#fff2b0'); }, '#8a5a12'),
   ferry: icon(P => { P.r(2, 10, 12, 3, '#7a4f2c'); P.r(3, 13, 10, 1, '#5e3b1e'); P.r(2, 11, 12, 1, '#efe6d2'); P.r(8, 2, 1, 8, '#4a3528'); P.r(9, 3, 5, 6, '#f4ead0'); P.r(4, 7, 3, 3, '#efe6d2'); }),
@@ -1422,8 +1430,8 @@ const SAVE_KEY = 'ostrov-ferma-v1';
 function newState() {
   return {
     v: 1, t: 6 * 60, paidIdx: 0, coins: 20,
-    bag: { seedWheat: 4, seedCarrot: 2, seedBeet: 0, seedPotato: 0, wheat: 0, carrot: 0, beet: 0, potato: 0, egg: 0, wood: 0, cement: 0, bed: 2, coop: 0, feeder: 0, fence: 0, gate: 0, lamp: 0, fenceLamp: 0, sapling: 0, millPlan: 0, cabinPlan: 0, kitchenPlan: 0, seedbox: 0, bakedPotato: 0, broth: 0 },
-    chest: { wheat: 0, carrot: 0, beet: 0, potato: 0, egg: 0, wood: 0 },
+    bag: { seedWheat: 4, seedCarrot: 2, seedBeet: 0, seedPotato: 0, wheat: 0, carrot: 0, beet: 0, potato: 0, egg: 0, wood: 0, cement: 0, bed: 2, coop: 0, feeder: 0, fence: 0, gate: 0, lamp: 0, fenceLamp: 0, sapling: 0, millPlan: 0, cabinPlan: 0, kitchenPlan: 0, seedbox: 0, bakedPotato: 0, broth: 0, bread: 0, flour: 0 },
+    chest: { wheat: 0, carrot: 0, beet: 0, potato: 0, egg: 0, flour: 0, wood: 0 },
     hasAxe: false, wild: true, wild2: true, bridges: { forest: 0, cows: 0 }, inMill: null,
     workers: [], ferry: null, energy: 100, inCabin: null,
     beds: [
@@ -1455,11 +1463,13 @@ function migrate(s) {
   s.bridges = Object.assign({ forest: 0, cows: 0 }, s.bridges);
   s.fire = s.fire || { fuel: 720, pile: 4, relightAt: 0 }; s.cold = s.cold || 0; s.rain.storm = !!s.rain.storm;
   s.workers = s.workers || []; s.ferry = s.ferry || null; if (s.energy == null) s.energy = 100;
-  for (const w of s.workers) { w.path = []; w.task = null; w.carry = w.carry || {}; }
+  for (const w of s.workers) { w.path = []; w.task = null; w.carry = w.carry || {}; if (w.full == null) w.full = 100; }
+  for (const o of s.objs) { if (o.type === 'mill') millData(o); if (o.type === 'cabin') o.plate = o.plate || []; }
   if (s.scene === 'cabin' && !(s.inCabin && s.objs.some(o => o.type === 'cabin' && o.tx === s.inCabin.tx && o.ty === s.inCabin.ty))) { s.scene = 'island'; s.px = 17.5 * TS; s.py = 17.5 * TS; }
   if (s.scene.startsWith('mill') && !(s.inMill && s.objs.some(o => o.type === 'mill' && o.built))) { s.scene = 'island'; s.px = 17.5 * TS; s.py = 17.5 * TS; }
   return s;
 }
+function millData(o) { o.hopper = o.hopper || 0; o.flour = o.flour || 0; o.grind = o.grind || 0; return o; }
 function loadState() {
   try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && s.v === 1) return migrate(s); } catch (e) { }
   return null;
@@ -1979,6 +1989,8 @@ function buildSite(o) {
   state.bag.wood -= N.wood || 0; state.bag.cement -= N.cement || 0; state.coins -= N.coins || 0;
   o.built = true;
   if (o.type === 'kitchen') { o.cook = null; o.ready = null; }
+  if (o.type === 'mill') millData(o);
+  if (o.type === 'cabin') o.plate = [];
   for (let i = 0; i < 8; i++) burst(o.tx * TS + Math.random() * o.w * TS, o.ty * TS + Math.random() * o.h * TS, 5, ['#efe6d2', '#9aa1a8', '#cf9a5e'], { up: 60 });
   toast(o.type === 'mill' ? 'Мельница построена! Заходи внутрь через дверь' : o.type === 'cabin' ? 'Домик работника готов! Нанять работника можно на пристани коровьего острова' : 'Кухня готова — можно готовить еду');
   rebuildDyn();
@@ -2170,9 +2182,13 @@ function updateWorkers(dt) {
     if (w.mode === 'follow') { followTick(w, dt); continue; }
     const home = cabinOf(w);
     if (!home) { w.mode = 'wait'; w.home = null; w.inside = false; continue; }
-    const door = { tx: home.tx, ty: home.ty + 2 };
-    if (!day || state.t < (w.restUntil || 0)) {
-      if (w.inside) continue;
+    const door = { tx: home.tx, ty: home.ty + 2 }, plate = home.plate || (home.plate = []);
+    // голодный работник днём сам идёт домой поесть, если на тарелке что-то есть
+    if (!day || state.t < (w.restUntil || 0) || (w.full < 35 && plate.length)) {
+      if (w.inside) {
+        if (w.full < 70 && plate.length) { eatFromPlate(w, home); if (day) w.restUntil = state.t + 30; }
+        continue;
+      }
       if (w.path.length) { moveWorker(w, dt); continue; }
       const t = wTile(w);
       if ((t.tx === door.tx && t.ty === door.ty) || !goTo(w, (x, y) => x === door.tx && y === door.ty)) {
@@ -2181,10 +2197,11 @@ function updateWorkers(dt) {
       continue;
     }
     if (w.inside) { w.inside = false; w.x = door.tx * TS + 8; w.y = door.ty * TS + 10; w.path = []; w.task = null; w.dir = 0; }
-    if (w.path.length) { moveWorker(w, dt); continue; }
+    const weak = w.full <= 0; // голодный работает медленно
+    if (w.path.length) { moveWorker(w, dt, weak ? 24 : 42); continue; }
     if (w.task) { doTask(w); continue; }
     if ((w.cd = (w.cd || 0) - dt) > 0) continue;
-    if (w.job && pickTask(w)) continue;
+    if (w.job && pickTask(w)) { if (weak) w.cd = 2; continue; }
     w.cd = 2 + Math.random() * 3;
     const gx = door.tx + Math.floor(Math.random() * 7) - 3, gy = door.ty + Math.floor(Math.random() * 4);
     if (tilePass(gx, gy)) goTo(w, (x, y) => x === gx && y === gy);
@@ -2194,7 +2211,7 @@ function workerAction(w) {
   if (w.mode === 'dock') return { hint: `${w.name}: «Здравствуйте! Ведите меня к домику»`, run: () => { w.mode = 'follow'; toast(`${w.name} ${verb(w, 'пошёл', 'пошла')} за тобой. Подведи к свободному домику работника`); } };
   if (w.mode === 'follow') return { hint: `${w.name} идёт за тобой · E — подождать здесь`, run: () => { w.mode = 'wait'; w.path = []; } };
   if (w.mode === 'wait') return { hint: `${w.name} ждёт · E — идти за мной`, run: () => { w.mode = 'follow'; } };
-  return { hint: `${w.name}: ${w.job ? JOB_NAMES[w.job] : 'отдыхает'} · удерживай E — работа`, run: () => toast(`${w.name}: ${w.job ? JOB_NAMES[w.job] : 'отдыхаю, дай мне работу'}`), worker: w };
+  return { hint: `${w.name}${w.full <= 25 ? ` (${verb(w, 'голоден', 'голодна')})` : ''}: ${w.job ? JOB_NAMES[w.job] : 'отдыхает'} · удерживай E — работа`, run: () => toast(`${w.name}: ${w.job ? JOB_NAMES[w.job] : 'отдыхаю, дай мне работу'}`), worker: w };
 }
 function setJob(w, job) {
   w.job = job === 'rest' ? null : job;
@@ -2208,7 +2225,7 @@ function openJobs(w) {
   openModal(() => {
     const row = (job, title, note) => `<div class="row"><div class="nm">${title}<small>${note}</small></div>
       <div class="btns"><button class="px ${((w.job || 'rest') === job) ? 'alt' : ''}" data-job="${job}">${((w.job || 'rest') === job) ? 'Сейчас' : 'Назначить'}</button></div></div>`;
-    return `<h2>${w.name}</h2><div class="say">Чем ${verb(w, 'ему', 'ей')} заняться? Работает с 7:00 до 19:00, в грозу сидит дома.</div>
+    return `<h2>${w.name}</h2><div class="say">Чем ${verb(w, 'ему', 'ей')} заняться? Работает с 7:00 до 19:00, в грозу сидит дома.<br>Сытость: ${Math.round(w.full)}%${w.full <= 0 ? ' — голодный работник всё делает медленно' : ''}. Еду кладут на тарелку в ${verb(w, 'его', 'её')} домике.</div>
     ${row('beds', 'Грядки', 'берёт семена из ящика для семян, сажает, собирает урожай, подсыпает пшеницу в кормушки (подходит к ним снаружи вольера), остальное кладёт в сундук. Поливать не умеет')}
     ${row('coop', 'Курятник', 'берёт пшеницу из ящика для семян и подсыпает в кормушки. Яйца собираешь ты')}
     ${row('rest', 'Отдых', 'гуляет возле своего домика')}
@@ -2232,7 +2249,7 @@ function hire() {
 }
 function ferryArrive() {
   const F = state.ferry;
-  state.workers.push({ id: Date.now() + Math.floor(Math.random() * 1000), name: F.name, fem: F.fem, pal: F.pal, x: ARRIVE.x, y: ARRIVE.y, dir: 3, mode: 'dock', home: null, job: null, inside: false, carry: {}, seed: null, task: null, path: [] });
+  state.workers.push({ id: Date.now() + Math.floor(Math.random() * 1000), name: F.name, fem: F.fem, pal: F.pal, x: ARRIVE.x, y: ARRIVE.y, dir: 3, mode: 'dock', home: null, job: null, inside: false, carry: {}, seed: null, task: null, path: [], full: 100 });
   state.ferry = null;
   toast(`Паром вернулся: ${F.name} ждёт на пристани коровьего острова`);
   save();
@@ -2269,15 +2286,34 @@ const CABIN_PROPS = [
   { spr: SPR.smallBed, x: 89, y: 35, sy: 64 },
   { spr: SPR.stove, x: 7, y: 21, sy: 46 },
   { spr: SPR.smallTable, x: 39, y: 53, sy: 68 },
+  { draw: drawPlateFood, sy: 68.01 },
   { spr: SPR.stool, x: 63, y: 59, sy: 68 },
   { draw: drawCabinResident, sy: 76 },
 ];
+function drawPlateFood() {
+  const c = cabinHere(); if (!c || !c.plate) return;
+  c.plate.forEach((k, i) => {
+    const [x, y] = [[46, 56], [50, 56], [47, 58], [50, 58]][i];
+    ctx.fillStyle = FOOD_COL[k]; ctx.fillRect(x - camX, y - camY, 3, 2);
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(x - camX, y - camY, 1, 1);
+  });
+}
+const plateText = c => c.plate.length ? c.plate.map(lower).join(', ') : 'пусто';
+function openPlate(c) {
+  modalObj = c;
+  const w = residentOf(c);
+  openModal(() => `<h2>Тарелка</h2><div class="say">${w ? `${w.name} поест, когда придёт домой вечером или проголодается днём. Сытость: ${Math.round(w.full)}%.` : 'В домике пока никто не живёт.'}<br>На тарелке (${c.plate.length}/${PLATE_CAP}): ${plateText(c)}.</div>
+    ${Object.keys(PLATE_FOOD).map(k => `<div class="row">${img(k)}<div class="nm">${ITEMS[k].name}<small>в мешочке: ${state.bag[k]} · сытость +${PLATE_FOOD[k]}</small></div>
+      <div class="btns"><button class="px" data-plate="${k}" ${state.bag[k] && c.plate.length < PLATE_CAP ? '' : 'disabled'}>Положить</button></div></div>`).join('')}
+    <div style="text-align:right;margin-top:10px"><button class="px alt" data-platetake="1" ${c.plate.length ? '' : 'disabled'}>Забрать всё</button></div>
+    <div class="foot">Голодный работник ходит и работает вдвое медленнее. Готовая еда сытнее сырых овощей.</div>`);
+}
 function cabinAction() {
   const { tx, ty } = targetTile(), c = cabinHere(), w = c && residentOf(c);
   if (w && w.inside && Math.hypot(player.x - 30, player.y - 76) < 24) return { hint: `${w.name} отдыхает · удерживай E — работа`, run: () => toast(`${w.name}: ${w.job ? JOB_NAMES[w.job] : 'отдыхаю'}`), worker: w };
   if (tx >= 5 && ty <= 3) return { hint: 'Маленькая кровать работника' };
   if (tx <= 1 && ty <= 2) return { hint: 'Печка — тихо потрескивает' };
-  if (tx >= 2 && tx <= 3 && ty >= 3 && ty <= 4) return { hint: 'Столик с тарелкой — скоро сюда можно будет класть еду' };
+  if (c && tx >= 2 && tx <= 3 && ty >= 3 && ty <= 4) return { hint: `Тарелка: ${plateText(c)} · E — положить еду`, run: () => openPlate(c) };
   if (ty <= 1) return { hint: 'Окошко' };
   if (tx === 3 && ty >= 5) return { hint: 'Выйти на улицу', run: exitCabin };
   return null;
@@ -2332,7 +2368,9 @@ function eat(k) {
   save();
 }
 function quickEat() {
-  const k = state.bag.broth && (state.energy <= 30 || !state.bag.bakedPotato) ? 'broth' : state.bag.bakedPotato ? 'bakedPotato' : null;
+  // сильно голоден — самое сытное, иначе самое лёгкое
+  const have = Object.keys(RECIPES).filter(k => state.bag[k] > 0).sort((a, b) => RECIPES[a].energy - RECIPES[b].energy);
+  const k = have.length ? have[state.energy <= 30 ? have.length - 1 : 0] : null;
   if (k) eat(k); else toast('Еды нет — приготовь на кухне');
 }
 let holdE = null, hungryToastT = -99;
@@ -2678,6 +2716,8 @@ function advanceTime(dm) {
     toast(`${RECIPES[o.ready].name}: готово! Забери на кухне`);
   }
   if (state.rain.storm) stormTick(dm);
+  grindTick(dm, state.rain.storm ? 3 : state.rain.on ? 1.5 : 1);
+  hungerTick(dm);
   fireTick(dm);
   coldTick(dm);
   for (const b of state.beds) {
@@ -2687,6 +2727,34 @@ function advanceTime(dm) {
   }
   growSpruces(dm);
   layEggs(state.t);
+}
+// мельница мелет засыпанную пшеницу, пока цела
+const millGrinding = o => o.built && !o.damaged && o.hopper >= 2 && o.flour < FLOUR_CAP;
+function grindTick(dm, mult) {
+  for (const o of state.objs) if (o.type === 'mill' && o.built) {
+    millData(o);
+    if (!millGrinding(o)) { o.grind = 0; continue; }
+    o.grind += dm * mult;
+    while (o.grind >= GRIND_TIME && millGrinding(o)) {
+      o.grind -= GRIND_TIME; o.hopper -= 2; o.flour++;
+      if (!millGrinding(o)) toast(o.flour >= FLOUR_CAP ? 'Полка для муки заполнена — забери муку' : 'Мельница смолола всю пшеницу — мука на полке');
+    }
+  }
+}
+// работники тратят сытость, пока работают
+function hungerTick(dm) {
+  const h = hourOf();
+  if (h < 7 || h >= 19) return;
+  for (const w of state.workers) if (w.mode === 'housed' && w.job && !w.inside) {
+    const was = w.full;
+    w.full = Math.max(0, w.full - dm * 100 / 720);
+    if (was > 25 && w.full <= 25) toast(`${w.name} ${verb(w, 'проголодался', 'проголодалась')} — положи еду на тарелку в домике работника`);
+  }
+}
+function eatFromPlate(w, home) {
+  const k = home.plate.shift();
+  w.full = Math.min(100, w.full + PLATE_FOOD[k]);
+  if (state.scene === 'cabin' && cabinHere() === home) toast(`${w.name} ${verb(w, 'поел', 'поела')}: ${lower(k)}`);
 }
 function growSpruces(dm) {
   for (const o of state.objs) if (o.type === 'spruce' && o.grow < GROW_SPRUCE) {
@@ -2706,6 +2774,7 @@ function sleep() {
     }
     layEggs(target);
     growSpruces(skip);
+    grindTick(skip, nightRain ? 1.5 : 1);
     state.energy = Math.max(0, state.energy - 15);
     for (const o of state.objs) if (o.type === 'kitchen' && o.cook) { o.ready = o.cook.dish; o.cook = null; }
     for (const ch of state.chickens) ch.inside = true;
@@ -3397,7 +3466,44 @@ function renderRoom(RM) {
 
 // ---- мельница: два этажа ----
 const MILL1_COLS = [{ x: 54, y: 72, w: 36, h: 14 }, { x: 116, y: 60, w: 16, h: 12 }, { x: 18, y: 62, w: 14, h: 8 }];
-const MILL1_PROPS = [{ spr: SPR.millstone, x: 51, y: 57, sy: 86 }, { spr: SPR.barrel, x: 17, y: 55, sy: 70 }];
+const MILL1_PROPS = [{ spr: SPR.millstone, x: 51, y: 57, sy: 86 }, { draw: drawMillstoneTop, sy: 86.01 }, { spr: SPR.barrel, x: 17, y: 55, sy: 70 }];
+const millHere = () => state.inMill && state.objs.find(o => o.type === 'mill' && o.built && o.tx === state.inMill.tx && o.ty === state.inMill.ty);
+// зерно в воронке, бегущий верхний камень и мучная пыль
+function drawMillstoneTop() {
+  const m = millHere(); if (!m) return;
+  millData(m);
+  if (m.hopper) { const hh = Math.min(3, Math.ceil(m.hopper * 3 / HOPPER_CAP)); ctx.fillStyle = '#f2cc4c'; ctx.fillRect(70 - camX, 63 - hh - camY, 4, hh); ctx.fillStyle = '#fbe590'; ctx.fillRect(70 - camX, 63 - hh - camY, 2, 1); }
+  const a = millGrinding(m) ? millAng * 1.5 : 0.6;
+  ctx.fillStyle = '#6c7078';
+  for (const s of [0, Math.PI]) ctx.fillRect(Math.round(72 + Math.cos(a + s) * 9) - 1 - camX, Math.round(71 + Math.sin(a + s) * 3.5) - camY, 3, 1);
+  if (millGrinding(m) && Math.random() < (state.rain.storm ? 0.6 : 0.25)) parts.push({ x: 72 + (Math.random() - 0.5) * 34, y: 78, vx: (Math.random() - 0.5) * 10, vy: -8 - Math.random() * 6, g: 4, life: 1.1, t: 0, c: Math.random() < 0.5 ? '#f4ecd8' : '#e3d8bc' });
+}
+function drawFlourShelf(m) {
+  const n = m.flour ? Math.min(8, Math.ceil(m.flour * 8 / FLOUR_CAP)) : 0;
+  for (let i = 0; i < n; i++) {
+    const x = 14 + (i % 4) * 11 - camX, y = (i < 4 ? 11 : 21) - camY;
+    ctx.fillStyle = '#efe6d2'; ctx.fillRect(x, y, 8, 8); ctx.fillRect(x + 1, y - 1, 6, 1);
+    ctx.fillStyle = '#d9ccb0'; ctx.fillRect(x + 2, y - 2, 4, 1); ctx.fillRect(x + 6, y, 2, 8);
+    ctx.fillStyle = '#c9a06a'; ctx.fillRect(x + 3, y + 3, 1, 1); ctx.fillRect(x + 4, y + 4, 1, 1);
+  }
+}
+function millstoneHint(m) {
+  if (m.damaged) return 'Жернова стоят — мельница повреждена молнией';
+  if (millGrinding(m)) return `Жернова мелют · пшеницы: ${m.hopper}${state.rain.storm ? ' · гроза, крутятся втрое быстрее!' : ''}`;
+  if (m.flour >= FLOUR_CAP) return 'Жернова стоят — полка с мукой полная';
+  return 'Жернова — засыпать пшеницу';
+}
+function openMillstone(m) {
+  modalObj = m;
+  openModal(() => `<h2>Жернова</h2><div class="say">Засыпь пшеницу в воронку — крылья вращают жернова, и мука сама ложится на полку.${m.damaged ? '<br>Сейчас мельница повреждена молнией и стоит — почини её снаружи.' : ''}</div>
+    <div class="row">${img('wheat')}<div class="nm">Пшеница в воронке<small>в мешочке: ${state.bag.wheat}${millGrinding(m) ? ` · мелется, мешок муки через ${Math.ceil((GRIND_TIME - m.grind) / (state.rain.storm ? 3 : state.rain.on ? 1.5 : 1))} мин` : ''}</small></div><div class="pr">${m.hopper} / ${HOPPER_CAP}</div>
+      <div class="btns"><button class="px" data-hopper="2" ${state.bag.wheat >= 2 && m.hopper < HOPPER_CAP - 1 ? '' : 'disabled'}>+2</button><button class="px" data-hopper="all" ${state.bag.wheat && m.hopper < HOPPER_CAP ? '' : 'disabled'}>Всё</button>
+      <button class="px alt" data-hoppertake="1" ${m.hopper ? '' : 'disabled'}>Забрать</button></div></div>
+    <div class="row">${img('flour')}<div class="nm">Мука на полке<small>в мешочке: ${state.bag.flour}</small></div><div class="pr">${m.flour} / ${FLOUR_CAP}</div>
+      <div class="btns"><button class="px alt" data-flourtake="1" ${m.flour ? '' : 'disabled'}>Забрать</button></div></div>
+    <div class="foot">2 пшеницы → 1 мешок муки за ${GRIND_TIME} мин. В дождь мельница крутится быстрее, а в грозу — втрое быстрее.<br>Мука продаётся через сундук по ${ITEMS.flour.sell} монет, а на кухне из неё пекут хлеб.</div>`);
+}
+function takeFlour(m) { state.bag.flour += m.flour; toast(`Мука ×${m.flour} — в мешочке`); m.flour = 0; save(); }
 const MILL2_COLS = [{ x: 66, y: 60, w: 12, h: 10 }, { x: 106, y: 78, w: 30, h: 28 }, { x: 14, y: 92, w: 38, h: 10 }];
 const MILL2_PROPS = [{ spr: SPR.shaft, x: 65, y: -1, sy: 70 }, { spr: SPR.bench, x: 13, y: 88, sy: 102 }];
 function mill1Walk(px, py) { if (py > 122) return px >= 62 && px <= 82 && py < 134; return px >= 5 && px <= 139 && py >= 46; }
@@ -3405,9 +3511,10 @@ function mill2Walk(px, py) { return px >= 5 && px <= 139 && py >= 50 && py <= 10
 function mill1Action() {
   const { tx, ty } = targetTile();
   if (tx >= 7 && ty <= 4) return { hint: 'Подняться на второй этаж', run: climbUp };
-  if (tx <= 3 && ty <= 2) return { hint: 'Полка для муки — здесь будет храниться мука' };
+  const m = millHere();
+  if (tx <= 3 && ty <= 2) return m && m.flour ? { hint: `Полка с мукой: ${m.flour} ${plural(m.flour, 'мешок', 'мешка', 'мешков')} · E — забрать`, run: () => takeFlour(m) } : { hint: 'Полка для муки — пока пусто, засыпь пшеницу в жернова' };
   if (tx === 4 && ty <= 2) return { hint: 'Узкое окно' };
-  if (tx >= 3 && tx <= 5 && ty >= 4 && ty <= 5) return { hint: 'Жернова — скоро будут молоть пшеницу в муку' };
+  if (m && tx >= 3 && tx <= 5 && ty >= 4 && ty <= 5) return { hint: millstoneHint(m), run: () => openMillstone(m) };
   if (tx === 1 && ty >= 3 && ty <= 4) return { hint: 'Бочка' };
   if (tx === 4 && ty >= 7) return { hint: 'Выйти на улицу', run: exitMill };
   return null;
@@ -3417,13 +3524,14 @@ function mill2Action() {
   if (ty <= 3 && player.dir === 1 && tx <= 3) return { hint: 'Смотреть на море', run: () => openPano('sea') };
   if (ty <= 3 && player.dir === 1 && tx >= 5) return { hint: 'Смотреть на наш остров', run: () => openPano('island') };
   if (tx >= 6 && ty >= 5) return { hint: 'Спуститься вниз', run: climbDown };
-  if (tx === 4) return { hint: 'Вал крыльев мельницы — крутится' };
+  if (tx === 4) { const m = millHere(); return { hint: m && m.damaged ? 'Вал крыльев мельницы — стоит, мельница повреждена' : state.rain.storm ? 'Вал крыльев мельницы — в грозу так и гудит!' : 'Вал крыльев мельницы — крутится' }; }
   return null;
 }
 function drawMill1Dyn(LT) {
   const [top, bot] = skyPair(LT);
   ctx.fillStyle = lerpHex(top, bot, 0.5); ctx.fillRect(66 - camX, 10 - camY, 12, 20);
   ctx.fillStyle = '#5d6168'; ctx.fillRect(71 - camX, 10 - camY, 2, 20);
+  const m = millHere(); if (m) drawFlourShelf(millData(m));
 }
 function drawMill2Dyn(LT) {
   const [top, bot] = skyPair(LT), [s1, s2] = seaPair(LT);
@@ -3550,6 +3658,11 @@ $('modalBody').addEventListener('click', e => {
   if (d.boxtake) { const o = modalObj; state.bag[d.boxtake] += o.seeds[d.boxtake]; o.seeds[d.boxtake] = 0; }
   if (d.cook) { cook(modalObj, d.cook); closeModal(); return; }
   if (d.eat) eat(d.eat);
+  if (d.hopper) { const m = modalObj, room = HOPPER_CAP - m.hopper, n = Math.min(state.bag.wheat, room, d.hopper === 'all' ? room : 2); state.bag.wheat -= n; m.hopper += n; }
+  if (d.hoppertake) { state.bag.wheat += modalObj.hopper; modalObj.hopper = 0; modalObj.grind = 0; }
+  if (d.flourtake) takeFlour(modalObj);
+  if (d.plate && state.bag[d.plate] && modalObj.plate.length < PLATE_CAP) { state.bag[d.plate]--; modalObj.plate.push(d.plate); }
+  if (d.platetake) { for (const k of modalObj.plate) state.bag[k]++; modalObj.plate = []; }
   if (d.pile) { const n = Math.min(d.pile === 'all' ? state.bag.wood : 1, state.bag.wood, PILE_CAP - state.fire.pile); state.bag.wood -= n; state.fire.pile += n; }
   if (d.fixmill) { repairMill(); closeModal(); return; }
   if (d.buildsite) { buildSite(modalObj); closeModal(); return; }

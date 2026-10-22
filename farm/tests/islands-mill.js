@@ -11,7 +11,7 @@ const { chromium } = require(require('child_process').execSync('npm root -g').to
   const t0 = Date.now();
   await p.goto(PAGE); await p.waitForTimeout(600);
   console.log('load ms', Date.now() - t0, 'errors', errs);
-  const shot = async (name, fn) => { await p.evaluate(fn); await p.waitForTimeout(350); await p.screenshot({ path: 'shots/' + name + '.png' }); };
+  const shot = async (name, fn) => { await p.evaluate(fn); await p.waitForTimeout(350); await p.screenshot({ path: path.join(SHOTS, name + '.png') }); };
   console.log(await p.evaluate(() => JSON.stringify(BRIDGES.map(B => ({ id: B.id, a: B.a, b: B.b, sign: B.sign, worker: B.worker, signLand: landV(B.sign.tx + .5, B.sign.ty + .5).toFixed(1), workerLand: landV(B.worker.tx + .5, B.worker.ty + .5).toFixed(1) }))) + ' forest spruces ' + FOREST_WILD.length));
   // sign interaction
   console.log(await p.evaluate(() => { const B = BRIDGES[0]; player.x = B.sign.tx * 16 + 8; player.y = (B.sign.ty + 1) * 16 + 10; player.dir = 1; return getAction().hint; }));

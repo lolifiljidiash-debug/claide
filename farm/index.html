@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Остров-ферма</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -12,12 +12,12 @@ html,body{height:100%;overflow:hidden;background:#2e72a8;touch-action:none;user-
 body{font-family:'Press Start 2P',monospace;color:#4a2f1d;font-size:10px}
 #game{position:fixed;left:0;top:0;image-rendering:pixelated;image-rendering:crisp-edges}
 .panel{background:#f3e3c1;border:3px solid #4a2f1d;box-shadow:inset -3px -3px 0 #d9bf8f,inset 3px 3px 0 #fff6de,0 3px 0 rgba(0,0,0,.25)}
-#hud{position:fixed;left:10px;top:10px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;pointer-events:none}
+#hud{position:fixed;left:calc(10px + env(safe-area-inset-left,0px));top:calc(10px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;align-items:flex-start;gap:6px;pointer-events:none}
 .hudrow{display:flex;align-items:center;gap:8px;padding:7px 10px 7px 8px;line-height:1}
 .hudrow img{width:24px;height:24px;image-rendering:pixelated}
 #toasts{position:fixed;top:12px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;width:max-content;max-width:min(92vw,520px)}
 .toast{padding:8px 12px;line-height:1.7;text-align:center;transition:opacity .5s}
-#bottom{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;width:max-content;max-width:100vw}
+#bottom{position:fixed;left:50%;bottom:calc(10px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;width:max-content;max-width:100vw}
 #hint{padding:6px 10px;line-height:1.6;text-align:center;max-width:92vw;pointer-events:none}
 #hint.dim{color:#8a6a4a}
 #hint:empty{display:none}
@@ -55,15 +55,15 @@ button.px.red{background:#c4503c;border-color:#6e2a1e;box-shadow:inset -2px -2px
 .cell b{display:block;font-size:11px;color:#4a2f1d}
 .cell button{margin-top:6px}
 .cell.inhand{border-color:#4a2f1d;background:#fff3d1}
-#help{position:fixed;right:10px;top:10px;padding:8px 10px;line-height:1.9;font-size:8px;pointer-events:none}
+#help{position:fixed;right:calc(10px + env(safe-area-inset-right,0px));top:calc(10px + env(safe-area-inset-top,0px));padding:8px 10px;line-height:1.9;font-size:8px;pointer-events:none}
 #help b{color:#6e4527}
 #fade{position:fixed;inset:0;background:#0b0d1e;opacity:0;pointer-events:none;transition:opacity .7s;display:flex;align-items:center;justify-content:center;color:#f3e3c1;font-size:14px}
 #touch{display:none}
 body.touch #touch{display:block}
 body.touch #help{display:none}
-#stick{position:fixed;left:18px;bottom:110px;width:120px;height:120px;border-radius:50%;background:rgba(243,227,193,.25);border:3px solid rgba(74,47,29,.5)}
+#stick{position:fixed;left:calc(18px + env(safe-area-inset-left,0px));bottom:calc(110px + env(safe-area-inset-bottom,0px));width:120px;height:120px;border-radius:50%;background:rgba(243,227,193,.25);border:3px solid rgba(74,47,29,.5)}
 #knob{position:absolute;left:36px;top:36px;width:42px;height:42px;border-radius:50%;background:#f3e3c1;border:3px solid #4a2f1d}
-#actBtn{position:fixed;right:18px;bottom:120px;width:78px;height:78px;border-radius:50%;font:inherit;font-size:16px;background:#f2cc4c;border:4px solid #4a2f1d;color:#4a2f1d;box-shadow:inset -4px -4px 0 #c9962f}
+#actBtn{position:fixed;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(120px + env(safe-area-inset-bottom,0px));width:78px;height:78px;border-radius:50%;font:inherit;font-size:16px;background:#f2cc4c;border:4px solid #4a2f1d;color:#4a2f1d;box-shadow:inset -4px -4px 0 #c9962f}
 @media (max-width:600px){
   .slot{width:44px;height:44px}.slot img{width:32px;height:32px}
   #hotbar{gap:4px;padding:4px}.slot.bagslot{margin-left:4px}
@@ -1220,8 +1220,8 @@ $('modalBody').addEventListener('click', e => {
   if (d.put) { const n = d.n === 'all' ? state.bag[d.put] : 1; state.bag[d.put] -= n; state.chest[d.put] += n; }
   if (d.take) { state.bag[d.take] += state.chest[d.take]; state.chest[d.take] = 0; }
   if (d.hand) { state.seedType = d.hand; state.sel = 3; closeModal(); toast(`В руке: ${bagName(d.hand)}`); return; }
-  if (d.reset) {
-    if (!confirm('Начать игру заново? Весь прогресс пропадёт.')) return;
+  if (d.reset === 'ask') { b.outerHTML = '<span style="margin-right:8px">Весь прогресс пропадёт.</span><button class="px red" data-reset="yes">Да, заново</button>'; return; }
+  if (d.reset === 'yes') {
     state = newState(); player.x = state.px; player.y = state.py; player.dir = 0; rainI = 0; closeModal(); return;
   }
   save(); refreshModal();
@@ -1262,7 +1262,7 @@ function openBag() {
         ${seed ? `<br><button class="px ${inHand ? 'alt' : ''}" data-hand="${k}">${inHand ? 'В руке' : 'Взять'}</button>` : ''}</div>`;
     }).join('')}</div>
     <div class="foot">Грядки ставятся молотком (1), сносятся кувалдой (2) — и возвращаются сюда.<br>Лейка (3): ${state.water}/${CAN_MAX}. Набрать воду — у берега или в колодце.</div>
-    <div style="text-align:right;margin-top:10px"><button class="px red" data-reset="1">Начать заново</button></div>`);
+    <div style="text-align:right;margin-top:10px"><button class="px red" data-reset="ask">Начать заново</button></div>`);
 }
 
 // ================= цикл =================
